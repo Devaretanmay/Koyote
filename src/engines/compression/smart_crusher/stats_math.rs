@@ -131,49 +131,59 @@ mod tests {
         assert!(approx_eq(v, 2.5), "got {v}, expected 2.5");
     }
 
+    #[test]
     fn sample_stdev_basic() {
         let s = sample_stdev(&[1.0, 2.0, 3.0, 4.0, 5.0]).unwrap();
         assert!(approx_eq(s, 2.5_f64.sqrt()), "got {s}");
     }
 
+    #[test]
     fn sample_variance_constant_values_is_zero() {
         let v = sample_variance(&[7.0, 7.0, 7.0]).unwrap();
         assert!(approx_eq(v, 0.0));
     }
 
+    #[test]
     fn mean_non_finite_overflow_returns_none() {
         let huge = f64::MAX / 2.0;
         let nums = vec![huge, huge, huge, huge];
         assert_eq!(mean(&nums), None);
     }
 
+    #[test]
     fn sample_variance_non_finite_returns_none() {
         let huge = 1e200;
         let v = sample_variance(&[huge, -huge]);
         assert_eq!(v, None);
     }
 
+    #[test]
     fn sample_stdev_non_finite_returns_none() {
         let huge = 1e200;
         assert_eq!(sample_stdev(&[huge, -huge]), None);
     }
 
+    #[test]
     fn median_empty_is_none() {
         assert_eq!(median(&[]), None);
     }
 
+    #[test]
     fn median_odd_count() {
         assert_eq!(median(&[3.0, 1.0, 2.0]), Some(2.0));
     }
 
+    #[test]
     fn median_even_count_mean_of_middles() {
         assert_eq!(median(&[4.0, 1.0, 2.0, 3.0]), Some(2.5));
     }
 
+    #[test]
     fn median_single_element() {
         assert_eq!(median(&[42.0]), Some(42.0));
     }
 
+    #[test]
     fn format_g_zero_and_special() {
         assert_eq!(format_g(0.0), "0");
         assert_eq!(format_g(-0.0), "0");
@@ -182,6 +192,7 @@ mod tests {
         assert_eq!(format_g(f64::NEG_INFINITY), "-inf");
     }
 
+    #[test]
     fn format_g_fixed_range() {
         assert_eq!(format_g(1.5), "1.5");
         assert_eq!(format_g(1.0), "1");
@@ -189,11 +200,13 @@ mod tests {
         assert_eq!(format_g(0.123456), "0.1235");
     }
 
+    #[test]
     fn format_g_scientific_range() {
         assert_eq!(format_g(12345.678), "1.235e+04");
         assert_eq!(format_g(0.00001234), "1.234e-05");
     }
 
+    #[test]
     fn format_g_negative() {
         assert_eq!(format_g(-1.5), "-1.5");
         assert_eq!(format_g(-12345.678), "-1.235e+04");

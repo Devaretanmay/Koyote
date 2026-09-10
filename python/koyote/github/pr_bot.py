@@ -440,8 +440,23 @@ def handle_push_event(
     if obs is None:
         return {"success": True, "event_type": "push", "handled": False,
                 "note": "no branch work to observe"}
-    cand = work_graph.record_push(obs)
-    evaluation = cross_repo.evaluate_candidate(obs["repository"], obs["branch"])
+    prior = work_graph.get_candidate(obs["repository"], obs["branch"])
+    prior_status = (prior or {}).get("status")
+    token = getattr(client, "token", None)
+    exact = False
+    try:
+        resolved = cross_repo.resolve_push_checkout(obs, token=token)
+        exact = bool(resolved.get("exact"))
+    except Exception as e:
+        _logger.warning("push SHA resolution failed for %s: %s",
+                        obs["repository"], e)
+    cand = work_graph.record_push(obs, exact_sha=exact)
+    evaluation = cross_repo.evaluate_candidate(
+        obs["repository"], obs["branch"],
+        force=(prior_status == work_graph.NOTIFIED))
+    if prior_status == work_graph.NOTIFIED and client is not None:
+        evaluation["reconciliation"] = cross_repo.reconcile_prior_notification(
+            obs["repository"], obs["branch"], client)
     notified: Any = False
     status = evaluation.get("status", cand["status"])
     if evaluation.get("fast_confirm") and client is not None:
@@ -453,7 +468,8 @@ def handle_push_event(
     return {"success": True, "event_type": "push",
             "repository": obs["repository"], "branch": obs["branch"],
             "candidate_id": cand["candidate_id"], "status": status,
-            "handled": True, "notified": notified}
+            "handled": True, "notified": notified,
+            "exact_sha": exact}
 
 
 def make_pr_bot_handler(

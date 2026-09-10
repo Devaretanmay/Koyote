@@ -268,6 +268,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn rare_status_nulls_count_in_value_counts_when_cardinality_passes() {
         let mut items: Vec<Value> = (0..90).map(|_| json!({"s": "ok"})).collect();
         for _ in 0..5 {
@@ -281,6 +282,7 @@ mod tests {
         assert_eq!(outliers.len(), 10, "5 warn + 5 null = 10 outliers");
     }
 
+    #[test]
     fn error_keywords_preservation_basic() {
         let items: Vec<Value> = vec![
             json!({"status": "ok"}),
@@ -293,6 +295,7 @@ mod tests {
         assert_eq!(errs, vec![1, 3]);
     }
 
+    #[test]
     fn error_keywords_case_insensitive() {
         let items: Vec<Value> = vec![
             json!({"msg": "FATAL: out of memory"}),
@@ -302,12 +305,14 @@ mod tests {
         assert_eq!(errs, vec![0, 1]);
     }
 
+    #[test]
     fn error_keywords_no_match() {
         let items: Vec<Value> = vec![json!({"name": "alice"}), json!({"count": 5})];
         let errs = detect_error_items_for_preservation(&items, None);
         assert!(errs.is_empty());
     }
 
+    #[test]
     fn error_keywords_uses_cached_strings_when_provided() {
         let items: Vec<Value> = vec![json!({"a": 1}), json!({"b": 2})];
         let cached = vec!["error".to_string(), "ok".to_string()];
@@ -315,6 +320,7 @@ mod tests {
         assert_eq!(errs, vec![0]);
     }
 
+    #[test]
     fn error_keywords_falls_back_when_cache_too_short() {
         let items: Vec<Value> = vec![json!({"a": 1}), json!({"msg": "error"})];
         let cached = vec!["ok".to_string()];
@@ -322,6 +328,7 @@ mod tests {
         assert_eq!(errs, vec![1]);
     }
 
+    #[test]
     fn error_keywords_skips_non_dict_items() {
         let items: Vec<Value> = vec![
             json!({"msg": "error"}),

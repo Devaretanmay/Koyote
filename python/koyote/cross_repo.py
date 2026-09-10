@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import subprocess
 import time as _time
 from typing import Any, Dict, List, Optional
 
@@ -24,13 +25,15 @@ from koyote.ai_planner import AIPatchPlanner, build_reasoning_context
 from koyote.autopatch import ScanConfig, scan_callsites
 from koyote.git_ops import git_commit_and_push
 from koyote.github.installations import store_dir as installations_store_dir
-from koyote.github.provisioning import cached_path
+from koyote.github.provisioning import cached_path, ensure_branch_checkout
 from koyote.knowledge import record_failure
 from koyote.repo_identity import STATE_ACTIVE, get_repository
 from koyote.sandbox.snapshot import SnapshotManager
 from koyote.test_runner import _detect_test_command, _run_tests
 
 _logger = logging.getLogger("koyote.cross_repo")
+
+DEFAULT_QUIET_S = 600
 
 
 def installed_repos(exclude: str = "") -> List[str]:
@@ -61,6 +64,39 @@ def consumer_checkout(repo: str) -> Optional[str]:
     if os.path.isdir(os.path.join(path, ".git")):
         return path
     return None
+
+
+def _sha_present(checkout: str, sha: str) -> bool:
+    try:
+        proc = subprocess.run(["git", "cat-file", "-e", sha], cwd=checkout,
+                              capture_output=True, timeout=30)
+        return proc.returncode == 0
+    except Exception:
+        return False
+
+
+def resolve_push_checkout(obs: Dict[str, Any], token: Any = None) -> Dict[str, Any]:
+    """Obtain the exact pushed revision when possible, else say so honestly.
+
+    Free path first (cached checkout already contains the SHA); network fetch
+    only with credentials or an explicit remote override, so unit contexts
+    never hang on unreachable remotes. Never claims an uninspected SHA.
+    """
+    repo, branch, sha = obs["repository"], obs["branch"], obs.get("after", "")
+    checkout = consumer_checkout(repo)
+    if checkout and sha and _sha_present(checkout, sha):
+        return {"workdir": checkout, "exact": True}
+    slug = repo.replace("/", "__").upper()
+    may_fetch = bool(token) or bool(os.environ.get(f"KOYOTE_REPO_REMOTE_{slug}"))
+    if may_fetch and sha:
+        try:
+            path, exact = ensure_branch_checkout(repo, branch, sha, token=token)
+        except Exception as e:
+            _logger.warning("exact push checkout failed for %s: %s", repo, e)
+            return {"workdir": None, "exact": False}
+        if exact:
+            return {"workdir": path, "exact": True}
+    return {"workdir": checkout, "exact": False}
 
 
 def short_name(repo: str) -> str:
@@ -109,31 +145,64 @@ def active_work_context(source_repo: str, source_branch: str, cand: Dict[str, An
                         target: Dict[str, Any]) -> str:
     """Active Work Context: the fourth context block for AI reasoning."""
     files = work_graph.candidate_changed_files(cand)
+    pushes = cand.get("pushes", [])
+    latest = pushes[-1] if pushes else {}
+    latest_files = ", ".join(latest.get("files", [])[:20]) or "unknown"
     branch_entry = work_graph.load_graph()["branches"].get(
         f"{source_repo}#{source_branch}", {})
+    exact = "exact pushed revision inspected" if cand.get("exact_sha") else (
+        "fallback — pushed SHA unavailable; analyzed payload file lists and "
+        "known checkout state, not the exact pushed revision")
     lines = [
         f"Source work: {source_repo}/{source_branch} @ {cand.get('head_sha', '')[:8]}",
+        f"Revision evidence: {exact}",
         f"Pushed by: {branch_entry.get('pusher', '') or 'unknown'} "
         f"({len(cand.get('pushes', []))} push(es) in this candidate)",
         f"Affected work: {target['repository']}/{target['branch']}",
         f"Changed files upstream ({len(files)}): " + (", ".join(files[:20]) or "unknown"),
+        f"Latest push {(latest.get('after', '') or '')[:8]}: {latest_files}",
         f"Consumption evidence: {target.get('evidence_callsites', 0)} callsite(s) "
         f"reference '{short_name(source_repo)}' in the affected checkout",
     ]
     return "\n".join(lines)
 
 
+def _stamp_evaluated(source_repo: str, source_branch: str, head: str, now: float) -> None:
+    graph = work_graph.load_graph()
+    cid = work_graph.candidate_id(source_repo, source_branch)
+    cand = graph["candidates"].get(cid)
+    if cand is None:
+        return
+    cand["last_evaluated_head"] = head
+    cand["last_evaluated_ts"] = now
+    cand["eval_pending"] = False
+    graph["candidates"][cid] = cand
+    work_graph.save_graph(graph)
+
+
 def evaluate_candidate(source_repo: str, source_branch: str,
-                       planner: Optional[Any] = None) -> Dict[str, Any]:
-    """Evaluate one candidate. Sets POTENTIAL on AI-confirmed impact, else retracts to OBSERVED."""
+                       planner: Optional[Any] = None, force: bool = False,
+                       quiet_s: int = DEFAULT_QUIET_S,
+                       now: Optional[float] = None) -> Dict[str, Any]:
+    """Evaluate one candidate. Sets POTENTIAL on AI-confirmed impact, else retracts to OBSERVED.
+
+    Cost bound: after an evaluation, later pushes coalesce until the quiet
+    window passes or a fast path forces re-evaluation of the latest head.
+    """
+    now = now if now is not None else _time.time()
     cand = work_graph.get_candidate(source_repo, source_branch)
     if cand is None:
         return {"evaluated": False, "reason": "no_candidate"}
+    last_ts = cand.get("last_evaluated_ts") or 0
+    if not force and last_ts and now - last_ts < quiet_s:
+        return {"evaluated": False, "reason": "coalesced",
+                "status": cand.get("status", work_graph.OBSERVED)}
     if planner is None:
         planner = AIPatchPlanner.from_env()
     if planner is None:
         return {"evaluated": False, "reason": "no_credentials_for_ai"}
     targets = find_plausible_targets(source_repo, source_branch)
+    _stamp_evaluated(source_repo, source_branch, cand.get("head_sha", ""), now)
     if not targets:
         work_graph.set_candidate_status(source_repo, source_branch, work_graph.OBSERVED)
         return {"evaluated": True, "status": work_graph.OBSERVED, "targets": []}
@@ -202,21 +271,51 @@ def _issue_body(source_repo: str, source_branch: str, cand: Dict[str, Any],
     return "\n".join(lines)
 
 
+def _issue_number(url: str) -> Optional[int]:
+    try:
+        return int((url or "").rstrip("/").split("/")[-1])
+    except Exception:
+        return None
+
+
+def _update_body(source_repo: str, source_branch: str, cand: Dict[str, Any]) -> str:
+    return (f"Howl update: `{source_repo}/{source_branch}` is still affected "
+            f"at `{cand.get('head_sha', '')[:8]}`. Prior impact assessment stands.")
+
+
+def _retract_body(source_repo: str, source_branch: str) -> str:
+    return (f"Howl correction: the change in `{source_repo}/{source_branch}` no longer "
+            f"appears to affect this work. This warning is retracted; no action needed.")
+
+
 def notify_confirmed(source_repo: str, source_branch: str, client: Any) -> Dict[str, Any]:
-    """File exactly one Issue per affected work. Read-only except Issues/comments."""
+    """One durable Issue per affected work; re-confirmation updates, never duplicates."""
     cand = work_graph.get_candidate(source_repo, source_branch)
     if cand is None or cand.get("status") != work_graph.CONFIRMED:
         return {"notified": False, "reason": "not_confirmed"}
-    if cand.get("notified_head") == cand.get("head_sha"):
-        return {"notified": False, "reason": "already_notified"}
-    notified = cand.get("notified_issues") or []
-    done = [n for n in notified if n.get("head") == cand.get("head_sha")]
-    issues: List[Dict[str, Any]] = []
     graph = work_graph.load_graph()
+    cid = work_graph.candidate_id(source_repo, source_branch)
+    fresh = graph["candidates"].get(cid, {})
+    notified = fresh.get("notified_issues") or []
+    issues: List[Dict[str, Any]] = []
+    updated: List[Dict[str, Any]] = []
     for target in cand.get("potential_targets") or []:
         key = f"{target['repository']}#{target['branch']}"
-        if any(n.get("target") == key for n in done):
-            continue
+        prior = next((n for n in notified
+                      if n.get("target") == key and n.get("state", "open") == "open"), None)
+        if prior is not None:
+            if prior.get("head") == cand.get("head_sha"):
+                continue  # same head already notified: stay silent
+            num = _issue_number(prior.get("url", ""))
+            if num is not None:
+                try:
+                    client.post_pr_comment(target["repository"], num,
+                                           _update_body(source_repo, source_branch, cand))
+                    prior["head"] = cand.get("head_sha")
+                    updated.append({"target": key, "url": prior.get("url")})
+                    continue
+                except Exception as e:
+                    _logger.warning("work-impact update failed for %s: %s", key, e)
         try:
             res = client.create_issue(
                 repo=target["repository"],
@@ -229,6 +328,8 @@ def notify_confirmed(source_repo: str, source_branch: str, client: Any) -> Dict[
             continue
         url = res.get("html_url") if isinstance(res, dict) else None
         issues.append({"target": key, "url": url})
+        notified.append({"target": key, "url": url, "head": cand.get("head_sha"),
+                         "state": "open"})
         branch_entry = graph["branches"].get(key, {})
         if branch_entry.get("open_pr") is not None and url:
             try:
@@ -237,18 +338,52 @@ def notify_confirmed(source_repo: str, source_branch: str, client: Any) -> Dict[
                     f"Howl: possible upstream impact — see {url}")
             except Exception as e:
                 _logger.warning("work-impact PR link failed for %s: %s", key, e)
-    graph = work_graph.load_graph()
-    cid = work_graph.candidate_id(source_repo, source_branch)
-    fresh = graph["candidates"].get(cid, {})
-    prior = fresh.get("notified_issues") or []
-    prior.extend([{"target": i["target"], "url": i["url"], "head": cand.get("head_sha")} for i in issues])
-    fresh["notified_issues"] = prior
+    fresh["notified_issues"] = notified
     fresh["notified_head"] = cand.get("head_sha")
     fresh["status"] = work_graph.NOTIFIED
     fresh["updated_ts"] = work_graph._now()
     graph["candidates"][cid] = fresh
     work_graph.save_graph(graph)
-    return {"notified": True, "issues": issues}
+    return {"notified": True, "issues": issues, "updated": updated}
+
+
+def reconcile_prior_notification(source_repo: str, source_branch: str,
+                                 client: Any) -> Dict[str, Any]:
+    """Correct an already-notified candidate after re-evaluation.
+
+    Still affected -> update stands (handled by notify path). No longer
+    affected -> retract with comment + close, so stale warnings never pose
+    as current truth.
+    """
+    cand = work_graph.get_candidate(source_repo, source_branch)
+    if cand is None or cand.get("status") != work_graph.OBSERVED:
+        return {"reconciled": False}
+    graph = work_graph.load_graph()
+    cid = work_graph.candidate_id(source_repo, source_branch)
+    fresh = graph["candidates"].get(cid, {})
+    notified = fresh.get("notified_issues") or []
+    retracted: List[Dict[str, Any]] = []
+    for n in notified:
+        if n.get("state", "open") != "open":
+            continue
+        num = _issue_number(n.get("url", ""))
+        if num is None:
+            continue
+        try:
+            client.post_pr_comment(n["target"].split("#")[0], num,
+                                   _retract_body(source_repo, source_branch))
+            client.close_issue(n["target"].split("#")[0], num)
+        except Exception as e:
+            _logger.warning("work-impact retraction failed for %s: %s",
+                            n.get("target"), e)
+            continue
+        n["state"] = "closed"
+        retracted.append({"target": n.get("target")})
+    if retracted:
+        fresh["notified_issues"] = notified
+        graph["candidates"][cid] = fresh
+        work_graph.save_graph(graph)
+    return {"reconciled": bool(retracted), "retracted": retracted}
 
 
 def confirm_candidate(source_repo: str, source_branch: str, reason: str,
@@ -265,12 +400,14 @@ def confirm_candidate(source_repo: str, source_branch: str, reason: str,
     return {"confirmed": True, "reason": reason, **result}
 
 
-def sweep_and_notify(client: Any, quiet_s: int = 600,
+def sweep_and_notify(client: Any, quiet_s: int = DEFAULT_QUIET_S,
                      now: Optional[float] = None) -> List[Dict[str, Any]]:
-    """Quiet POTENTIAL -> STABLE -> confirm+notify (or silent retract)."""
+    """Quiet POTENTIAL -> STABLE -> evaluate latest -> confirm+notify (or silent retract)."""
     now = now if now is not None else _time.time()
     outcomes: List[Dict[str, Any]] = []
     for cand in work_graph.sweep_quiet(window_s=quiet_s, now=now):
+        evaluate_candidate(cand["repository"], cand["branch"], force=True,
+                           quiet_s=quiet_s, now=now)
         res = confirm_candidate(cand["repository"], cand["branch"], "stable_quiet_period", client)
         outcomes.append({"repository": cand["repository"], "branch": cand["branch"], **res})
     return outcomes
@@ -292,7 +429,7 @@ def pr_fastpath(payload: Dict[str, Any], client: Any) -> Dict[str, Any]:
     work_graph.record_branch_activity(repo, ref, sha, open_pr=number)
     if action not in ("opened", "reopened") and not (action == "closed" and merged):
         return {"fastpath": True, "action": "tracked"}
-    evaluation = evaluate_candidate(repo, ref)
+    evaluation = evaluate_candidate(repo, ref, force=True)
     if evaluation.get("status") != work_graph.POTENTIAL:
         return {"fastpath": True, "action": "evaluated", "confirmed": False}
     reason = "merged" if merged else "pr_opened"

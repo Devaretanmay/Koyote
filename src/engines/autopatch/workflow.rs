@@ -35,10 +35,13 @@ pub struct WorkflowDef {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TriggerConfig {
     pub kind: TriggerKind,
+    #[serde(default)]
     pub api_name: String,
+    #[serde(default)]
     pub schedule_cron: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TriggerKind {
     SchemaDrift,
     Vulnerability,
@@ -52,6 +55,9 @@ pub fn parse_workflow(json: &str) -> Result<WorkflowDef, String> {
     serde_json::from_str(json).map_err(|e| format!("Workflow parse error: {e}"))
 }
 
+///   - All depends_on references exist.
+///   - No circular dependencies (simple check).
+///   - At least one step.
 pub fn validate_workflow(wf: &WorkflowDef) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
 
@@ -59,6 +65,7 @@ pub fn validate_workflow(wf: &WorkflowDef) -> Result<(), Vec<String>> {
         errors.push("Workflow must have at least one step".into());
     }
 
+    // Check unique names.
     let mut seen = std::collections::HashSet::new();
     for step in &wf.steps {
         if !seen.insert(&step.name) {
@@ -66,6 +73,7 @@ pub fn validate_workflow(wf: &WorkflowDef) -> Result<(), Vec<String>> {
         }
     }
 
+    // Check depends_on references.
     let names: std::collections::HashSet<&str> = wf.steps.iter().map(|s| s.name.as_str()).collect();
     for step in &wf.steps {
         for dep in &step.depends_on {
@@ -88,6 +96,8 @@ pub fn validate_workflow(wf: &WorkflowDef) -> Result<(), Vec<String>> {
     }
 }
 
+/// Compute a topological execution order for the workflow steps.
+/// Returns step names in the order they should execute.
 pub fn execution_order(wf: &WorkflowDef) -> Result<Vec<String>, String> {
     let mut in_degree: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
     let mut dependents: std::collections::HashMap<&str, Vec<&str>> =
@@ -134,6 +144,7 @@ pub fn execution_order(wf: &WorkflowDef) -> Result<Vec<String>, String> {
     Ok(order)
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -156,6 +167,7 @@ mod tests {
 }"#
     }
 
+    #[test]
     fn workflow_parses_valid_json() {
         let wf = parse_workflow(sample_workflow_json()).unwrap();
         assert_eq!(wf.name, "stripe-api-drift");
@@ -163,15 +175,18 @@ mod tests {
         assert_eq!(wf.trigger.kind, TriggerKind::SchemaDrift);
     }
 
+    #[test]
     fn workflow_parse_invalid_json_returns_error() {
         assert!(parse_workflow("not json").is_err());
     }
 
+    #[test]
     fn workflow_validates_valid_workflow() {
         let wf = parse_workflow(sample_workflow_json()).unwrap();
         assert!(validate_workflow(&wf).is_ok());
     }
 
+    #[test]
     fn workflow_validates_catches_duplicate_names() {
         let json = r#"{
   "name": "test",
@@ -186,6 +201,7 @@ mod tests {
         assert!(errs.iter().any(|e| e.contains("Duplicate")));
     }
 
+    #[test]
     fn workflow_validates_catches_missing_dependency() {
         let json = r#"{
   "name": "test",
@@ -199,6 +215,7 @@ mod tests {
         assert!(errs.iter().any(|e| e.contains("does not exist")));
     }
 
+    #[test]
     fn workflow_validates_catches_self_dependency() {
         let json = r#"{
   "name": "test",
@@ -212,6 +229,7 @@ mod tests {
         assert!(errs.iter().any(|e| e.contains("depends on itself")));
     }
 
+    #[test]
     fn workflow_validates_catches_empty_steps() {
         let json = r#"{
   "name": "test",
@@ -223,10 +241,12 @@ mod tests {
         assert!(errs.iter().any(|e| e.contains("at least one step")));
     }
 
+    #[test]
     fn workflow_execution_order_topological() {
         let wf = parse_workflow(sample_workflow_json()).unwrap();
         let order = execution_order(&wf).unwrap();
         assert_eq!(order.len(), 6);
+        // radar must come before impact and plan.
         let radar_pos = order.iter().position(|s| s == "radar").unwrap();
         let impact_pos = order.iter().position(|s| s == "impact").unwrap();
         let plan_pos = order.iter().position(|s| s == "plan").unwrap();
@@ -241,6 +261,7 @@ mod tests {
         assert!(test_pos < verify_pos);
     }
 
+    #[test]
     fn workflow_execution_order_detects_cycle() {
         let json = r#"{
   "name": "cycle",
@@ -254,6 +275,7 @@ mod tests {
         assert!(execution_order(&wf).is_err());
     }
 
+    #[test]
     fn workflow_execution_order_parallel_roots() {
         let json = r#"{
   "name": "parallel",

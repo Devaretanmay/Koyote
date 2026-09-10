@@ -301,6 +301,7 @@ mod tests {
         assert_eq!(result.len(), 5);
     }
 
+    #[test]
     fn prioritize_dedup_collapses_then_returns_under_max() {
         let items = vec![
             json!({"name": "alice"}),
@@ -312,6 +313,7 @@ mod tests {
         assert_eq!(result, idx_set(&[0, 2]));
     }
 
+    #[test]
     fn prioritize_keeps_error_items_when_over_budget() {
         let mut items: Vec<Value> = (0..30)
             .map(|i| json!({"id": i, "msg": format!("ok {}", i)}))
@@ -325,6 +327,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn prioritize_includes_first_3_and_last_2_when_room() {
         let items: Vec<Value> = (0..30).map(|i| json!({"id": i, "v": i})).collect();
         let kept: BTreeSet<usize> = (5..15).collect();

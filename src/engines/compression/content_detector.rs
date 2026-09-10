@@ -508,6 +508,7 @@ func helper() {}
         assert_eq!(r.content_type, ContentType::SourceCode);
     }
 
+    #[test]
     fn fallback_to_plain_text() {
         let content = "Just some random text without any special structure.";
         let r = detect_content_type(content);
@@ -515,24 +516,28 @@ func helper() {}
         assert_eq!(r.confidence, 0.5);
     }
 
+    #[test]
     fn json_array_of_dicts_true_path() {
         let r = detect_content_type(r#"[{"a": 1}, {"a": 2}]"#);
         assert_eq!(r.content_type, ContentType::JsonArray);
         assert_eq!(r.confidence, 1.0);
     }
 
+    #[test]
     fn json_array_of_scalars_not_dict_array() {
         let r = detect_content_type(r#"[1, 2, 3]"#);
         assert_eq!(r.content_type, ContentType::JsonArray);
         assert_eq!(r.confidence, 0.8);
     }
 
+    #[test]
     fn diff_low_confidence_does_not_short_circuit() {
         let content = "diff --git a/x b/x\n";
         let r = detect_content_type(content);
         assert_eq!(r.content_type, ContentType::GitDiff);
     }
 
+    #[test]
     fn html_below_threshold_falls_through() {
         let r = detect_content_type("<div>hello</div>");
         assert_ne!(r.content_type, ContentType::Html);

@@ -1119,6 +1119,7 @@ mod tests {
         assert_eq!(result.compressed, plain);
     }
 
+    #[test]
     fn process_string_does_not_alter_short_quoted_strings() {
         let c = SmartCrusher::new(SmartCrusherConfig::default());
         let doc = json!({"msg": "{this looks like json but isnt}"});
@@ -1126,6 +1127,7 @@ mod tests {
         assert_eq!(out, doc);
     }
 
+    #[test]
     fn process_string_helper_parses_only_containers() {
         assert!(try_parse_json_container("{\"a\":1}").is_some());
         assert!(try_parse_json_container("[1,2,3]").is_some());
@@ -1135,6 +1137,7 @@ mod tests {
         assert!(try_parse_json_container("{malformed").is_none());
     }
 
+    #[test]
     fn enable_ccr_marker_false_suppresses_marker_and_store() {
         let store: Arc<InMemoryCcrStore> = Arc::new(InMemoryCcrStore::new());
         let cfg = SmartCrusherConfig {
@@ -1165,6 +1168,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn enable_ccr_marker_true_is_default_behavior() {
         let store: Arc<InMemoryCcrStore> = Arc::new(InMemoryCcrStore::new());
         let cfg = SmartCrusherConfig {
@@ -1195,6 +1199,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn enable_ccr_marker_false_suppresses_opaque_markers() {
         let rows: Vec<Value> = (0..10)
             .map(|i| json!({"path": "a.py", "line": i, "content": "x".repeat(300)}))
@@ -1232,6 +1237,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn lossless_only_leaves_array_uncompacted_instead_of_dropping() {
         let rows: Vec<Value> = (0..50)
             .map(|i| json!({"path": "a.py", "line": i, "content": "x".repeat(300)}))
@@ -1257,6 +1263,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn lossless_only_inlines_opaque_blobs_when_table_ships() {
         let rows: Vec<Value> = (0..10)
             .map(|i| json!({"path": "a.py", "line": i, "content": "x".repeat(300)}))
@@ -1280,6 +1287,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn lossless_only_never_writes_to_ccr_store() {
         let store: Arc<InMemoryCcrStore> = Arc::new(InMemoryCcrStore::new());
         let cfg = SmartCrusherConfig {

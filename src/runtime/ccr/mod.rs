@@ -128,6 +128,7 @@ mod tests {
         assert_eq!(store.get("never_stored"), None);
     }
 
+    #[test]
     fn put_overwrites_under_same_hash() {
         let store = InMemoryCcrStore::new();
         store.put("h", "first");
@@ -136,6 +137,7 @@ mod tests {
         assert_eq!(store.len(), 1);
     }
 
+    #[test]
     fn capacity_evicts_oldest() {
         let store = InMemoryCcrStore::with_capacity_and_ttl(2, DEFAULT_TTL);
         store.put("a", "1");
@@ -147,6 +149,7 @@ mod tests {
         assert_eq!(store.get("c"), Some("3".to_string()));
     }
 
+    #[test]
     fn expired_entries_are_dropped_on_get() {
         let store = InMemoryCcrStore::with_capacity_and_ttl(10, Duration::from_millis(10));
         store.put("a", "1");
@@ -155,11 +158,13 @@ mod tests {
         assert_eq!(store.len(), 0);
     }
 
+    #[test]
     fn store_is_send_sync() {
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<InMemoryCcrStore>();
     }
 
+    #[test]
     fn basic_put_get_is_empty() {
         let store = InMemoryCcrStore::new();
         store.put("h", "v");

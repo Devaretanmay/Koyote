@@ -49,6 +49,7 @@ fn schema_diff(old_json: &str, new_json: &str) -> PyResult<String> {
     serde_json::to_string_pretty(&diff).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
+#[pyfunction]
 fn ast_locate_callsites(root_dir: &str, config_json: &str) -> PyResult<String> {
     let config: ScanConfig = if config_json.is_empty() || config_json == "{}" {
         ScanConfig::default()
@@ -59,6 +60,7 @@ fn ast_locate_callsites(root_dir: &str, config_json: &str) -> PyResult<String> {
     serde_json::to_string_pretty(&result).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
+#[pyfunction]
 fn autopatch_plan(
     old_json: &str,
     new_json: &str,
@@ -75,6 +77,7 @@ fn autopatch_plan(
     serde_json::to_string_pretty(&plan).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
+#[pyfunction]
 fn synthesize_contracts(
     api_name: &str,
     old_ver: &str,
@@ -94,12 +97,14 @@ fn synthesize_contracts(
     }
 }
 
+#[pyfunction]
 fn render_report_markdown(plan_json: &str) -> PyResult<String> {
     let plan: MaintenancePlan =
         serde_json::from_str(plan_json).map_err(|e| PyValueError::new_err(e.to_string()))?;
     Ok(render_markdown(&plan))
 }
 
+#[pyfunction]
 fn workflow_validate(workflow_json: &str) -> PyResult<Vec<String>> {
     let wf = parse_workflow(workflow_json).map_err(PyValueError::new_err)?;
     match validate_workflow(&wf) {
@@ -108,22 +113,26 @@ fn workflow_validate(workflow_json: &str) -> PyResult<Vec<String>> {
     }
 }
 
+#[pyfunction]
 fn workflow_execution_order(workflow_json: &str) -> PyResult<Vec<String>> {
     let wf = parse_workflow(workflow_json).map_err(PyValueError::new_err)?;
     execution_order(&wf).map_err(PyValueError::new_err)
 }
 
+#[pyfunction]
 fn inventory_scan(repo_root: &str) -> PyResult<String> {
     let inv = crate::engines::autopatch::run_inventory(repo_root);
     serde_json::to_string_pretty(&inv).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
+#[pyfunction]
 fn trust_report_render(plan_json: &str) -> PyResult<String> {
     let plan: MaintenancePlan =
         serde_json::from_str(plan_json).map_err(|e| PyValueError::new_err(e.to_string()))?;
     Ok(crate::engines::autopatch::render_trust_report_cli(&plan))
 }
 
+#[pyfunction]
 fn patch_apply(repo_root: &str, plan_json: &str, dry_run: bool) -> PyResult<String> {
     let plan: MaintenancePlan =
         serde_json::from_str(plan_json).map_err(|e| PyValueError::new_err(e.to_string()))?;
@@ -132,17 +141,22 @@ fn patch_apply(repo_root: &str, plan_json: &str, dry_run: bool) -> PyResult<Stri
     serde_json::to_string_pretty(&results).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
+#[pyfunction]
+#[pyo3(signature = (repo_root="."))]
 fn dependency_graph_build(repo_root: &str) -> PyResult<String> {
     let graph = crate::engines::graph::build_external_dependency_graph(repo_root, None);
     serde_json::to_string_pretty(&graph).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
+#[pyfunction]
+#[pyo3(signature = (repo_root="."))]
 fn dependency_graph_audit(repo_root: &str) -> PyResult<String> {
     let graph = crate::engines::graph::build_external_dependency_graph(repo_root, None);
     let summary = graph.audit_summary();
     serde_json::to_string_pretty(&summary).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
+#[pymodule]
 fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sandbox_apply, m)?)?;
     m.add_function(wrap_pyfunction!(sandbox_check_supported, m)?)?;

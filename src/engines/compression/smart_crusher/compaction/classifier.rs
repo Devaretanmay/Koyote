@@ -151,6 +151,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn stringified_json_array_is_parsed() {
         let v = json!(r#"[1,2,3]"#);
         match classify_cell(&v, &cfg()) {
@@ -161,11 +162,13 @@ mod tests {
         }
     }
 
+    #[test]
     fn stringified_scalar_is_not_recursed() {
         assert_eq!(classify_cell(&json!("123"), &cfg()), CellClass::Scalar);
         assert_eq!(classify_cell(&json!("true"), &cfg()), CellClass::Scalar);
     }
 
+    #[test]
     fn malformed_brace_string_is_long_opaque_or_scalar() {
         let short = json!("{not json}");
         assert_eq!(classify_cell(&short, &cfg()), CellClass::Scalar);
@@ -176,6 +179,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn long_string_stays_scalar_when_opaque_markers_disabled() {
         let v = Value::String("x".repeat(512));
         assert!(matches!(classify_cell(&v, &cfg()), CellClass::Opaque(_)));
@@ -186,6 +190,7 @@ mod tests {
         assert_eq!(classify_cell(&v, &no_markers), CellClass::Scalar);
     }
 
+    #[test]
     fn base64_blob_detected() {
         let s = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/==".repeat(5);
         match classify_cell(&Value::String(s), &cfg()) {
@@ -194,6 +199,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn html_chunk_detected() {
         let s = "<html><body><p>".to_string() + &"x".repeat(300) + "</p></body></html>";
         match classify_cell(&Value::String(s), &cfg()) {
@@ -202,6 +208,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn long_plain_string_is_long_opaque() {
         let s = "the quick brown fox ".repeat(20);
         match classify_cell(&Value::String(s), &cfg()) {
@@ -210,6 +217,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn math_with_lt_is_not_html() {
         let s = "a < b but not really ".repeat(20);
         match classify_cell(&Value::String(s), &cfg()) {
@@ -218,6 +226,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn config_threshold_respected() {
         let mut c = cfg();
         c.opaque_min_bytes = 10;

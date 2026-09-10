@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 pub struct RouteConfig {
     pub prefix: String,
     pub upstream: String,
+    #[serde(default)]
     pub credential_source: String,
 }
 
@@ -32,6 +33,7 @@ impl RouteConfig {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -43,12 +45,14 @@ mod tests {
         }
     }
 
+    #[test]
     fn matches_prefix() {
         let r = route();
         assert!(r.matches("/openai/v1/chat"));
         assert!(!r.matches("/anthropic/v1"));
     }
 
+    #[test]
     fn rewrites_path() {
         let r = route();
         assert_eq!(
@@ -58,6 +62,7 @@ mod tests {
         assert_eq!(r.rewrite_path("/openai"), "https://api.openai.com/");
     }
 
+    #[test]
     fn resolves_env_credential() {
         std::env::set_var("TEST_KOYOTE_KEY", "sk-test-123");
         let r = route();

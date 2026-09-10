@@ -7,6 +7,7 @@ import os
 import time
 
 from koyote import cross_repo, work_graph
+from koyote.github.pr_bot import handle_push_event
 from koyote.github.provisioning import cached_path
 from koyote.github.push_events import parse_push_payload
 
@@ -128,3 +129,44 @@ def test_no_credentials_fail_closed(tmp_path, monkeypatch):
     res = cross_repo.evaluate_candidate("acme/api-service", "feature/payments")
     assert res == {"evaluated": False, "reason": "no_credentials_for_ai"}
     assert work_graph.get_candidate("acme/api-service", "feature/payments")["status"] == work_graph.OBSERVED
+
+
+class FakeIssueClient:
+    def __init__(self):
+        self.issues = []
+
+    def create_issue(self, repo, title, body, labels=None):
+        self.issues.append({"repo": repo, "title": title})
+        return {"html_url": f"https://example/{repo}/issues/{len(self.issues)}",
+                "number": len(self.issues)}
+
+    def post_pr_comment(self, repo, pr_number, body):
+        return {"id": 1}
+
+
+def test_push_storm_bounds_ai_evaluations(tmp_path, monkeypatch):
+    _consumer_setup(tmp_path, monkeypatch)
+    stub = StubPlanner()
+    monkeypatch.setattr(cross_repo.AIPatchPlanner, "from_env",
+                        classmethod(lambda cls: stub))
+    for i in range(100):
+        res = handle_push_event(_push_raw(after=f"head{i:03d}"), client=None)
+        assert res["handled"] is True
+    assert len(stub.calls) == 1  # first push only; rest coalesced
+    cand = work_graph.get_candidate("acme/api-service", "feature/payments")
+    assert cand["head_sha"] == "head099"
+    assert cand["eval_pending"] is True
+    out = cross_repo.sweep_and_notify(FakeIssueClient(), quiet_s=0,
+                                      now=time.time() + 10**6)
+    assert len(stub.calls) == 2  # sweep evaluates the latest head only
+    assert stub.calls[-1]["to_version"] == "head099"
+    assert out[0]["confirmed"] is True
+    assert len(out[0]["issues"]) == 1
+
+
+def _push_raw(repo="acme/api-service", branch="feature/payments", after="abc123"):
+    return {
+        "ref": f"refs/heads/{branch}", "before": "0" * 40, "after": after,
+        "repository": {"full_name": repo}, "pusher": {"name": "dev1"},
+        "commits": [{"id": after, "added": ["src/api.ts"], "removed": [], "modified": []}],
+    }

@@ -188,31 +188,37 @@ mod tests {
         assert_eq!(calculate_string_entropy("aaaa"), 0.0);
     }
 
+    #[test]
     fn entropy_perfectly_uniform_normalized_to_one() {
         let e = calculate_string_entropy("ab");
         assert!((e - 1.0).abs() < 1e-9);
     }
 
+    #[test]
     fn entropy_mostly_repeated_low() {
         let e = calculate_string_entropy("aaaaaab");
         assert!(e < 0.7);
     }
 
+    #[test]
     fn entropy_high_for_random_looking_string() {
         let e = calculate_string_entropy("a3f7b2c9d8e1f4a7");
         assert!(e > 0.7);
     }
 
+    #[test]
     fn sequential_simple_int_ascending() {
         let v: Vec<Value> = (1..=10).map(|i| json!(i)).collect();
         assert!(detect_sequential_pattern(&v, true));
     }
 
+    #[test]
     fn sequential_too_few_values() {
         let v = vec![json!(1), json!(2), json!(3)];
         assert!(!detect_sequential_pattern(&v, true));
     }
 
+    #[test]
     fn sequential_random_numbers_not_detected() {
         let v: Vec<Value> = vec![
             json!(100),
@@ -225,16 +231,19 @@ mod tests {
         assert!(!detect_sequential_pattern(&v, true));
     }
 
+    #[test]
     fn sequential_descending_with_check_order_rejected() {
         let v: Vec<Value> = (1..=10).rev().map(|i| json!(i)).collect();
         assert!(!detect_sequential_pattern(&v, true));
     }
 
+    #[test]
     fn sequential_descending_without_check_order_accepted() {
         let v: Vec<Value> = (1..=10).rev().map(|i| json!(i)).collect();
         assert!(detect_sequential_pattern(&v, false));
     }
 
+    #[test]
     fn bug2_zero_padded_strings_no_longer_misclassified() {
         let v: Vec<Value> = (1..=10).map(|i| json!(format!("{:03}", i))).collect();
         assert!(
@@ -243,11 +252,13 @@ mod tests {
         );
     }
 
+    #[test]
     fn bug2_mixed_string_and_int_still_detected() {
         let v = vec![json!(1), json!(2), json!("3"), json!(4), json!(5), json!(6)];
         assert!(detect_sequential_pattern(&v, true));
     }
 
+    #[test]
     fn sequential_bools_excluded() {
         let v = vec![
             json!(true),
@@ -260,16 +271,19 @@ mod tests {
         assert!(!detect_sequential_pattern(&v, true));
     }
 
+    #[test]
     fn sequential_floats_with_unit_step() {
         let v: Vec<Value> = (1..=10).map(|i| json!(i as f64)).collect();
         assert!(detect_sequential_pattern(&v, true));
     }
 
+    #[test]
     fn sequential_fractional_unit_step() {
         let v: Vec<Value> = vec![json!(1.5), json!(2.5), json!(3.5), json!(4.5), json!(5.5)];
         assert!(detect_sequential_pattern(&v, true));
     }
 
+    #[test]
     fn bug2_all_unparseable_strings_returns_false() {
         let v: Vec<Value> = vec![
             json!("abc"),
@@ -281,6 +295,7 @@ mod tests {
         assert!(!detect_sequential_pattern(&v, true));
     }
 
+    #[test]
     fn bug2_single_int_among_strings_still_detects() {
         let v: Vec<Value> = vec![
             json!("001"),
@@ -293,38 +308,45 @@ mod tests {
         assert!(detect_sequential_pattern(&v, true));
     }
 
+    #[test]
     fn python_int_parse_basic() {
         assert_eq!(python_int_parse("5"), Some(5));
         assert_eq!(python_int_parse("-5"), Some(-5));
         assert_eq!(python_int_parse("+5"), Some(5));
     }
 
+    #[test]
     fn python_int_parse_strips_whitespace() {
         assert_eq!(python_int_parse("  5  "), Some(5));
         assert_eq!(python_int_parse("\t-3\n"), Some(-3));
     }
 
+    #[test]
     fn python_int_parse_underscores() {
         assert_eq!(python_int_parse("3_000"), Some(3000));
         assert_eq!(python_int_parse("1_000_000"), Some(1_000_000));
     }
 
+    #[test]
     fn python_int_parse_underscore_edge_cases_rejected() {
         assert_eq!(python_int_parse("_5"), None);
         assert_eq!(python_int_parse("5_"), None);
         assert_eq!(python_int_parse("3__000"), None);
     }
 
+    #[test]
     fn python_int_parse_rejects_floats() {
         assert_eq!(python_int_parse("3.14"), None);
     }
 
+    #[test]
     fn python_int_parse_rejects_non_numeric() {
         assert_eq!(python_int_parse("abc"), None);
         assert_eq!(python_int_parse(""), None);
         assert_eq!(python_int_parse("   "), None);
     }
 
+    #[test]
     fn sequential_with_whitespace_padded_strings_via_python_int_parse() {
         let v: Vec<Value> = vec![
             json!(1),

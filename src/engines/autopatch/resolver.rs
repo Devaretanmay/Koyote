@@ -480,47 +480,56 @@ pub fn assess_impact(
     )
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::engines::ast::CallsiteKind;
 
 
+    #[test]
     fn resolves_charges_create_to_correct_endpoint() {
         let r = resolve_stripe_method("charges.create").unwrap();
         assert_eq!(r.http_method, "POST");
         assert_eq!(r.path, "/v1/charges");
     }
 
+    #[test]
     fn resolves_checkout_sessions_create_to_correct_endpoint() {
         let r = resolve_stripe_method("checkout.sessions.create").unwrap();
         assert_eq!(r.path, "/v1/checkout/sessions");
     }
 
+    #[test]
     fn resolves_billing_portal_sessions_create() {
         let r = resolve_stripe_method("billingPortal.sessions.create").unwrap();
         assert_eq!(r.path, "/v1/billing_portal/sessions");
     }
 
+    #[test]
     fn resolves_subscription_cancel_to_delete() {
         let r = resolve_stripe_method("subscriptions.cancel").unwrap();
         assert_eq!(r.http_method, "DELETE");
     }
 
+    #[test]
     fn returns_none_for_unknown_chain() {
         assert!(resolve_stripe_method("something.unknown.method").is_none());
     }
 
+    #[test]
     fn strips_await_stripe_prefix() {
         let r = resolve_stripe_method("await stripe.charges.create(").unwrap();
         assert_eq!(r.path, "/v1/charges");
     }
 
+    #[test]
     fn strips_this_stripe_prefix() {
         let r = resolve_stripe_method("this.stripe.paymentIntents.create").unwrap();
         assert_eq!(r.path, "/v1/payment_intents");
     }
 
 
+    #[test]
     fn method_call_to_charges_is_confirmed_for_charges_change() {
         let confidence = assess_impact(
             &CallsiteKind::MethodCall,
@@ -531,6 +540,7 @@ mod tests {
         assert_eq!(confidence, MatchConfidence::Confirmed);
     }
 
+    #[test]
     fn checkout_sessions_is_false_positive_for_charges_change() {
         let confidence = assess_impact(
             &CallsiteKind::MethodCall,
@@ -541,6 +551,7 @@ mod tests {
         assert_eq!(confidence, MatchConfidence::FalsePositive);
     }
 
+    #[test]
     fn billing_portal_is_false_positive_for_charges_change() {
         let confidence = assess_impact(
             &CallsiteKind::MethodCall,
@@ -551,6 +562,7 @@ mod tests {
         assert_eq!(confidence, MatchConfidence::FalsePositive);
     }
 
+    #[test]
     fn import_is_unresolvable() {
         let confidence = assess_impact(&CallsiteKind::Import, "stripe", "POST", "/v1/charges");
         assert!(confidence.is_unresolved());
@@ -560,6 +572,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn url_reference_matches_correct_path() {
         let confidence = assess_impact(
             &CallsiteKind::UrlReference,
@@ -570,6 +583,7 @@ mod tests {
         assert_eq!(confidence, MatchConfidence::Confirmed);
     }
 
+    #[test]
     fn url_reference_rejects_wrong_path() {
         let confidence = assess_impact(
             &CallsiteKind::UrlReference,
@@ -580,6 +594,7 @@ mod tests {
         assert_eq!(confidence, MatchConfidence::FalsePositive);
     }
 
+    #[test]
     fn correctly_rejects_sixteen_false_positives() {
         let callsite_patterns = vec![
             (CallsiteKind::Import, "stripe"),
@@ -598,6 +613,7 @@ mod tests {
             (CallsiteKind::MethodCall, "events.list"),
             (CallsiteKind::MethodCall, "coupons.create"),
             (CallsiteKind::MethodCall, "promotionCodes.create"),
+            // Only these should be confirmed:
             (CallsiteKind::MethodCall, "charges.create"),
             (CallsiteKind::MethodCall, "charges.retrieve"),
         ];
@@ -621,6 +637,7 @@ mod tests {
         assert_eq!(unresolvable, 2, "import + type reference are unresolvable");
     }
 
+    #[test]
     fn dynamic_spec_route_index_synthesizes_methods() {
         let mut index = SpecRouteIndex::new();
         index.index_endpoint("/v1/checkout/sessions", "POST");
@@ -645,6 +662,7 @@ mod tests {
         assert_eq!(r4.http_method, "POST");
     }
 
+    #[test]
     fn resolves_openai_and_anthropic_canonical_methods() {
         let openai = resolve_canonical_method("openai.chat.completions.create").unwrap();
         assert_eq!(openai.path, "/v1/chat/completions");

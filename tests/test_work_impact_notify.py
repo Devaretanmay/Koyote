@@ -4,12 +4,14 @@
 
 import json
 import os
+import subprocess
 import time
 
 from koyote import cross_repo, work_graph
 from koyote.github.provisioning import cached_path
 from koyote.github.push_events import parse_push_payload
-from koyote.github.pr_bot import handle_push_event
+from koyote.github.pr_bot import handle_push_event, make_pr_bot_handler
+from koyote.github.watch import watch_once
 
 
 class StubPlanner:
@@ -27,6 +29,7 @@ class FakeClient:
     def __init__(self):
         self.issues = []
         self.comments = []
+        self.closed = []
 
     def create_issue(self, repo, title, body, labels=None):
         self.issues.append({"repo": repo, "title": title, "body": body})
@@ -36,6 +39,10 @@ class FakeClient:
     def post_pr_comment(self, repo, pr_number, body):
         self.comments.append({"repo": repo, "pr": pr_number, "body": body})
         return {"id": len(self.comments)}
+
+    def close_issue(self, repo, issue_number):
+        self.closed.append({"repo": repo, "number": issue_number})
+        return {"state": "closed"}
 
 
 def _env(tmp_path, monkeypatch):
@@ -180,3 +187,87 @@ def test_pr_event_without_candidate_untouched(tmp_path, monkeypatch):
     }, client)
     assert res == {"fastpath": False}
     assert not os.path.exists(os.environ["KOYOTE_WORK_GRAPH_FILE"])
+
+
+def test_post_notify_retraction_closes_issue(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch, confidence="high")
+    client = FakeClient()
+    first = handle_push_event(_raw_push("acme/api-service", "feature/payments", "aaa"), client)
+    assert first["status"] == work_graph.NOTIFIED
+    assert len(client.issues) == 1
+    monkeypatch.setattr(cross_repo, "scan_callsites", lambda d, cfg: {"callsites": []})
+    second = handle_push_event(_raw_push("acme/api-service", "feature/payments", "bbb"), client)
+    assert second["status"] == work_graph.OBSERVED
+    assert len(client.issues) == 1  # no duplicate
+    assert len(client.closed) == 1  # retracted with close
+    assert client.closed[0] == {"repo": "acme/admin", "number": 1}
+    assert any("retracted" in c["body"] for c in client.comments)
+    cand = work_graph.get_candidate("acme/api-service", "feature/payments")
+    assert cand["status"] == work_graph.OBSERVED
+    assert cand["notified_issues"][0]["state"] == "closed"
+
+
+def test_post_notify_still_affected_updates_same_issue(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch, confidence="high")
+    client = FakeClient()
+    handle_push_event(_raw_push("acme/api-service", "feature/payments", "aaa"), client)
+    assert len(client.issues) == 1
+    second = handle_push_event(_raw_push("acme/api-service", "feature/payments", "bbb"), client)
+    assert second["status"] == work_graph.NOTIFIED
+    assert len(client.issues) == 1
+    assert client.closed == []
+    assert any("still affected" in c["body"] for c in client.comments)
+
+
+def _git_repo(path, branch="feature/payments"):
+    def run(*a):
+        return subprocess.run(["git", *a], cwd=path, capture_output=True,
+                              text=True, timeout=60, check=True)
+
+    os.makedirs(path, exist_ok=True)
+    run("init"), run("config", "user.email", "t@e.com"), run("config", "user.name", "t")
+    run("checkout", "-b", branch)
+    with open(os.path.join(path, "api.ts"), "w") as f:
+        f.write("export const v = 1;\n")
+    run("add", "."), run("commit", "-m", "change")
+    return subprocess.run(["git", "rev-parse", "HEAD"], cwd=path, capture_output=True,
+                          text=True, timeout=60, check=True).stdout.strip()
+
+
+def test_merge_dispatch_confirms_immediately(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch, confidence="medium")
+    client = FakeClient()
+    pushed = handle_push_event(_raw_push("acme/api-service", "feature/payments", "aaa"), client)
+    assert pushed["status"] == work_graph.POTENTIAL
+    sha = _git_repo(str(tmp_path / "upstream"))
+    monkeypatch.setenv("KOYOTE_REPO_REMOTE_ACME__API-SERVICE",
+                       str(tmp_path / "upstream"))
+    handler = make_pr_bot_handler(client=client, policy=None)
+    res = handler({
+        "action": "closed",
+        "repository": {"full_name": "acme/api-service"},
+        "pull_request": {"number": 7, "title": "payments", "body": "",
+                         "merged": True, "state": "closed",
+                         "head": {"ref": "feature/payments", "sha": sha},
+                         "base": {"ref": "main"}},
+    }, "pull_request.closed")
+    assert res["event_type"] == "pull_request.closed"
+    assert len(client.issues) == 1
+    assert client.issues[0]["repo"] == "acme/admin"
+
+
+def test_watch_sweeper_confirms_and_notifies(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch, confidence="medium")
+    os.makedirs(os.path.join(cached_path("acme/api-service"), ".git"), exist_ok=True)
+    client = FakeClient()
+    pushed = handle_push_event(_raw_push("acme/api-service", "feature/payments", "aaa"), client)
+    assert pushed["status"] == work_graph.POTENTIAL
+    graph = work_graph.load_graph()
+    cid = work_graph.candidate_id("acme/api-service", "feature/payments")
+    graph["candidates"][cid]["updated_ts"] = time.time() - 10**6
+    work_graph.save_graph(graph)
+    outcomes = watch_once(client=client)
+    swept = [o for o in outcomes if o.get("sweep")]
+    assert len(swept) == 1 and swept[0]["confirmed"] is True
+    assert len(client.issues) == 1
+    assert client.issues[0]["repo"] == "acme/admin"

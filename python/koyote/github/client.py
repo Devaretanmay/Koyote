@@ -352,3 +352,8 @@ class GitHubAppClient:
         if labels:
             data["labels"] = labels
         return self._request("POST", f"repos/{repo}/issues", data=data)
+
+    def close_issue(self, repo: str, issue_number: int) -> dict[str, Any]:
+        """Close an issue (e.g. retracted impact warning)."""
+        return self._request("PATCH", f"repos/{repo}/issues/{issue_number}",
+                             data={"state": "closed"})

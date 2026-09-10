@@ -214,6 +214,7 @@ mod tests {
         let _ = fs::remove_dir_all(&workdir);
     }
 
+    #[test]
     fn restore_restores_deleted_file() {
         let workdir = tmpdir("del");
         let snap = format!("{workdir}.snap");
@@ -231,6 +232,7 @@ mod tests {
         let _ = fs::remove_dir_all(&workdir);
     }
 
+    #[test]
     fn excludes_build_dirs() {
         let workdir = tmpdir("excl");
         let snap = format!("{workdir}.snap");

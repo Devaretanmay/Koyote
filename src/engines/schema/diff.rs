@@ -228,6 +228,7 @@ fn diff_endpoint(old: &ParsedEndpoint, new: &ParsedEndpoint) -> Vec<FieldChange>
     changes
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::engines::schema::parse_spec;
@@ -314,6 +315,7 @@ mod tests {
 }"#
     }
 
+    #[test]
     fn schema_diff_detects_removed_endpoint() {
         let old = parse_spec(old_spec_json()).unwrap();
         let new = parse_spec(new_spec_json()).unwrap();
@@ -330,6 +332,7 @@ mod tests {
             .any(|c| matches!(c.kind, ChangeKind::EndpointRemoved)));
     }
 
+    #[test]
     fn schema_diff_detects_added_endpoint() {
         let old = parse_spec(old_spec_json()).unwrap();
         let new = parse_spec(new_spec_json()).unwrap();
@@ -346,6 +349,7 @@ mod tests {
             .any(|c| matches!(c.kind, ChangeKind::EndpointAdded)));
     }
 
+    #[test]
     fn schema_diff_detects_param_type_change() {
         let old = parse_spec(old_spec_json()).unwrap();
         let new = parse_spec(new_spec_json()).unwrap();
@@ -371,6 +375,7 @@ mod tests {
         assert_eq!(type_change.severity, BreakingSeverity::Breaking);
     }
 
+    #[test]
     fn schema_diff_detects_param_removed() {
         let old = parse_spec(old_spec_json()).unwrap();
         let new = parse_spec(new_spec_json()).unwrap();
@@ -389,6 +394,7 @@ mod tests {
                 && matches!(c.kind, ChangeKind::ParameterRemoved)));
     }
 
+    #[test]
     fn schema_diff_detects_required_param_added() {
         let old = parse_spec(old_spec_json()).unwrap();
         let new = parse_spec(new_spec_json()).unwrap();
@@ -408,6 +414,7 @@ mod tests {
         assert_eq!(added.severity, BreakingSeverity::Breaking);
     }
 
+    #[test]
     fn schema_diff_detects_response_field_removed() {
         let old = parse_spec(old_spec_json()).unwrap();
         let new = parse_spec(new_spec_json()).unwrap();
@@ -426,6 +433,7 @@ mod tests {
                 && matches!(c.kind, ChangeKind::ResponseFieldRemoved)));
     }
 
+    #[test]
     fn schema_diff_detects_response_field_type_change() {
         let old = parse_spec(old_spec_json()).unwrap();
         let new = parse_spec(new_spec_json()).unwrap();
@@ -448,6 +456,7 @@ mod tests {
                 )));
     }
 
+    #[test]
     fn schema_diff_counts_severities() {
         let old = parse_spec(old_spec_json()).unwrap();
         let new = parse_spec(new_spec_json()).unwrap();
@@ -465,6 +474,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn schema_diff_identical_specs_produces_no_changes() {
         let spec = parse_spec(old_spec_json()).unwrap();
         let diff = diff_specs(&spec, &spec);

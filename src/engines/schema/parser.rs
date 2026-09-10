@@ -182,6 +182,7 @@ fn extract_type(schema: &Value) -> String {
         .to_string()
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -218,6 +219,7 @@ mod tests {
 }"#
     }
 
+    #[test]
     fn schema_parse_spec_extracts_info() {
         let parsed = parse_spec(sample_spec()).unwrap();
         assert_eq!(parsed.info.title, "Payments API");
@@ -225,6 +227,7 @@ mod tests {
         assert_eq!(parsed.info.endpoint_count, 1);
     }
 
+    #[test]
     fn schema_parse_spec_extracts_parameters() {
         let parsed = parse_spec(sample_spec()).unwrap();
         let ep = parsed.endpoints.get("post:/v1/charges").unwrap();
@@ -233,6 +236,7 @@ mod tests {
         assert_eq!(ep.parameters.get("amount").unwrap().param_type, "integer");
     }
 
+    #[test]
     fn schema_parse_spec_extracts_response_fields() {
         let parsed = parse_spec(sample_spec()).unwrap();
         let ep = parsed.endpoints.get("post:/v1/charges").unwrap();
@@ -240,10 +244,12 @@ mod tests {
         assert_eq!(ep.response_fields.get("id").unwrap().field_type, "string");
     }
 
+    #[test]
     fn schema_parse_spec_invalid_json_returns_error() {
         assert!(parse_spec("not json").is_err());
     }
 
+    #[test]
     fn schema_parse_spec_empty_paths() {
         let spec = r#"{"openapi":"3.0.0","info":{"title":"Empty","version":"1"},"paths":{}}"#;
         let parsed = parse_spec(spec).unwrap();

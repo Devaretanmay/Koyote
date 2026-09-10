@@ -96,12 +96,14 @@ pub struct UnresolvedCallsite {
     pub why_autofix_disabled: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ImpactState {
     ConfirmedAffected,
     ProvablyUnaffected,
     Unresolved,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImpactedEndpoint {
     pub path: String,
     pub method: String,
@@ -112,10 +114,13 @@ pub struct ImpactedEndpoint {
     pub false_positive_count: usize,
     pub unresolvable_count: usize,
     pub total_sdk_references: usize,
+    #[serde(default)]
     pub unresolved_callsites: Vec<UnresolvedCallsite>,
+    #[serde(default)]
     pub provably_unaffected_callsites: Vec<AffectedCallsite>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatchTarget {
     pub file_path: String,
     pub line_numbers: Vec<usize>,
@@ -123,12 +128,17 @@ pub struct PatchTarget {
     pub upstream_change: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerificationSpec {
     pub endpoint: String,
     pub method: String,
     pub fields_to_verify: Vec<String>,
 }
 
+///   2. Find every affected callsite in the codebase.
+///   3. Know which files to patch and why.
+///   4. Generate contract tests to verify correctness.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MaintenancePlan {
     pub status: PlanStatus,
     pub api_name: String,
@@ -144,15 +154,19 @@ pub struct MaintenancePlan {
 
 
 
+/// Verification outcome of an automated patch or test trial.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VerificationOutcome {
     Verified,
     BehavioralDriftDetected { reason: String },
     InsufficientEvidence { explanation: String },
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
+    #[test]
     fn uncertainty_reason_taxonomy_has_at_least_ten_variants() {
         let reasons = vec![
             UncertaintyReason::ImportReference,

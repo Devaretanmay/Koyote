@@ -435,6 +435,7 @@ mod tests {
         assert!(!out.contains("__dropped"));
     }
 
+    #[test]
     fn estimate_matches_format_len() {
         let items = vec![json!({"a": 1}), json!({"a": 2})];
         let c = compact(&items, &cfg());
@@ -442,6 +443,7 @@ mod tests {
         assert_eq!(f.estimate_bytes(&c), f.format(&c).len());
     }
 
+    #[test]
     fn csv_smaller_than_json_for_tabular() {
         let items: Vec<Value> = (0..50)
             .map(|i| {
@@ -464,6 +466,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn csv_substantially_smaller_than_raw_json() {
         let items: Vec<Value> = (0..50)
             .map(|i| {

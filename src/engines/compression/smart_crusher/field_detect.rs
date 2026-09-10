@@ -228,6 +228,7 @@ mod tests {
         assert!(!is_score);
     }
 
+    #[test]
     fn score_field_unbounded_range_rejected() {
         let s = stats_with_range("metric", 0.0, 1000.0);
         let items: Vec<Value> = (0..10).map(|i| json!({"metric": i * 100})).collect();
@@ -235,6 +236,7 @@ mod tests {
         assert!(!is_score);
     }
 
+    #[test]
     fn score_field_signed_similarity_range() {
         let s = stats_with_range("similarity", -0.9, 0.95);
         let items: Vec<Value> = (0..10)
@@ -245,6 +247,7 @@ mod tests {
         assert!(is_score);
     }
 
+    #[test]
     fn score_field_below_threshold_rejected() {
         let s = stats_with_range("metric", 0.0, 100.0);
         let items: Vec<Value> = vec![
@@ -258,6 +261,7 @@ mod tests {
         assert!(!is_score);
     }
 
+    #[test]
     fn score_field_non_numeric_rejected() {
         let s = stats("name", "string", 0.5);
         let items: Vec<Value> = vec![
@@ -269,6 +273,7 @@ mod tests {
         assert!(!is_score);
     }
 
+    #[test]
     fn score_field_missing_min_max_rejected() {
         let s = stats("score", "numeric", 1.0);
         let items: Vec<Value> = vec![json!({"score": 0.5})];
@@ -276,6 +281,7 @@ mod tests {
         assert!(!is_score);
     }
 
+    #[test]
     fn score_field_confidence_capped_at_95() {
         let s = stats_with_range("score", 0.0, 1.0);
         let items: Vec<Value> = (0..50)

@@ -270,65 +270,78 @@ mod tests {
         assert_eq!(count_unique_simhash(&items, 3), 3);
     }
 
+    #[test]
     fn count_unique_simhash_threshold_groups_near_dupes() {
         let items = ["abc", "abc"];
         assert_eq!(count_unique_simhash(&items, 0), 1);
     }
 
+    #[test]
     fn bigram_curve_distinct_words() {
         let items = ["the cat", "the dog", "a fish"];
         assert_eq!(compute_unique_bigram_curve(&items), vec![1, 2, 3]);
     }
 
+    #[test]
     fn bigram_curve_single_word_dedup() {
         let items = ["hello", "world", "hello"];
         assert_eq!(compute_unique_bigram_curve(&items), vec![1, 2, 2]);
     }
 
+    #[test]
     fn bigram_curve_empty_string_contributes_one() {
         let items = ["", "a", "a b"];
         assert_eq!(compute_unique_bigram_curve(&items), vec![1, 2, 3]);
     }
 
+    #[test]
     fn bigram_curve_lowercases_for_dedup() {
         let items = ["Hello", "hello"];
         assert_eq!(compute_unique_bigram_curve(&items), vec![1, 1]);
     }
 
+    #[test]
     fn find_knee_too_short_is_none() {
         assert_eq!(find_knee(&[]), None);
         assert_eq!(find_knee(&[1]), None);
         assert_eq!(find_knee(&[1, 2]), None);
     }
 
+    #[test]
     fn find_knee_flat_curve_returns_one() {
         assert_eq!(find_knee(&[5, 5, 5, 5, 5]), Some(1));
     }
 
+    #[test]
     fn find_knee_concave_curve() {
         assert_eq!(find_knee(&[1, 5, 8, 9, 10, 10, 10, 10, 10]), Some(3));
     }
 
+    #[test]
     fn find_knee_linear_no_clear_knee() {
         assert_eq!(find_knee(&[1, 2, 3, 4, 5, 6, 7, 8, 9]), None);
     }
 
+    #[test]
     fn validate_zlib_passthrough_when_k_at_max() {
         let items = ["a", "b", "c"];
         assert_eq!(validate_with_zlib(&items, 3, 10, 0.15), 3);
     }
 
+    #[test]
     fn validate_zlib_passthrough_when_total_too_small() {
         let items: [&str; 5] = ["short"; 5];
         assert_eq!(validate_with_zlib(&items, 2, 100, 0.15), 2);
     }
 
+    #[test]
     fn validate_zlib_bumps_k_when_subset_undercompresses() {
         let items: [&str; 20] = ["the quick brown fox jumps over the lazy dog"; 20];
         let result = validate_with_zlib(&items, 5, 100, 0.15);
         assert_eq!(result, 6, "expected 1.2x bump from 5 to 6");
     }
 
+    #[test]
     fn validate_zlib_passthrough_when_subset_representative() {
         let many: Vec<String> = (0..20)
             .map(|i| {
@@ -343,16 +356,19 @@ mod tests {
         assert_eq!(result, 10, "expected passthrough for representative subset");
     }
 
+    #[test]
     fn compute_optimal_k_n_le_8_returns_n() {
         let items = ["a", "b", "c", "d", "e"];
         assert_eq!(compute_optimal_k(&items, 1.0, 3, None), 5);
     }
 
+    #[test]
     fn compute_optimal_k_low_diversity_returns_unique_count() {
         let items: [&str; 10] = ["abc"; 10];
         assert_eq!(compute_optimal_k(&items, 1.0, 3, None), 3);
     }
 
+    #[test]
     fn compute_optimal_k_all_unique_keeps_all() {
         let items: Vec<String> = (0..20)
             .map(|i| format!("unique item number {} with some long content", i))
@@ -361,6 +377,7 @@ mod tests {
         assert_eq!(compute_optimal_k(&refs, 1.0, 3, None), 20);
     }
 
+    #[test]
     fn compute_optimal_k_respects_max_k() {
         let items: Vec<String> = (0..20).map(|i| format!("item {}", i)).collect();
         let refs: Vec<&str> = items.iter().map(|s| s.as_str()).collect();
@@ -368,12 +385,14 @@ mod tests {
         assert!(k <= 10, "k={} should be <= max_k=10", k);
     }
 
+    #[test]
     fn compute_optimal_k_respects_min_k() {
         let items: [&str; 20] = ["abc"; 20];
         let k = compute_optimal_k(&items, 1.0, 5, None);
         assert_eq!(k, 5);
     }
 
+    #[test]
     fn compute_optimal_k_bias_keeps_more() {
         let items: Vec<String> = (0..30).map(|i| format!("item content {}", i)).collect();
         let refs: Vec<&str> = items.iter().map(|s| s.as_str()).collect();

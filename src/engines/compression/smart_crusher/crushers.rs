@@ -604,6 +604,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn bug1_percentile_proper_linear_interpolation() {
         let mut items: Vec<Value> = (1..=9).map(|i| json!(i)).collect();
         items.extend(vec![json!(null); 5]);
@@ -612,6 +613,7 @@ mod tests {
         assert!(strat.contains("p75=7"), "got: {}", strat);
     }
 
+    #[test]
     fn bug1_percentile_interpolates_when_index_non_integer() {
         let items: Vec<Value> = (1..=10).map(|i| json!(i * 10)).collect();
         let (_out, strat) = crush_number_array(&items, &cfg(), 1.0);

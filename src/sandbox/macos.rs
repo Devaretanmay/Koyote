@@ -214,22 +214,26 @@ mod tests {
         assert!(profile.contains("(deny default)"));
     }
 
+    #[test]
     fn test_generate_profile_network_blocked() {
         let profile = generate_profile("/tmp/test", true);
         assert!(profile.contains("(deny network*)"));
         assert!(profile.contains("(allow network-outbound (remote tcp \"localhost:*\"))"));
     }
 
+    #[test]
     fn test_generate_profile_network_allowed() {
         let profile = generate_profile("/tmp/test", false);
         assert!(profile.contains("(allow network*)"));
         assert!(!profile.contains("(deny network*)"));
     }
 
+    #[test]
     fn test_check_supported() {
         assert!(check_supported());
     }
 
+    #[test]
     fn test_escape_path_handles_special_chars() {
         assert_eq!(escape_path("/tmp/test"), "/tmp/test");
         assert!(escape_path("/tmp/\"test\"").contains('"'));

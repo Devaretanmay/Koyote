@@ -295,17 +295,20 @@ mod tests {
         let _ = detect_abi();
     }
 
+    #[test]
     fn test_check_supported_consistent() {
         let a = check_supported();
         let b = check_supported();
         assert_eq!(a, b);
     }
 
+    #[test]
     fn test_get_info_returns_platform() {
         let info = get_info();
         assert_eq!(info.platform, "linux");
     }
 
+    #[test]
     fn test_landlock_abi_constants() {
         let v1_access = AccessFs::from_all(ABI::V1);
         assert!(v1_access.contains(AccessFs::ReadFile));

@@ -95,13 +95,14 @@ def candidate_changed_files(cand: Dict[str, Any]) -> List[str]:
     return seen
 
 
-def record_push(obs: Dict[str, Any], open_pr: Optional[int] = None) -> Dict[str, Any]:
+def record_push(obs: Dict[str, Any], open_pr: Optional[int] = None,
+                exact_sha: Optional[bool] = None, now: Optional[float] = None) -> Dict[str, Any]:
     """Group a push observation into its repo+branch candidate. Re-evaluates."""
     graph = load_graph()
     repo, branch = obs["repository"], obs["branch"]
     key = f"{repo}#{branch}"
     cid = candidate_id(repo, branch)
-    now = _now()
+    now = now if now is not None else _now()
 
     entry = graph["branches"].get(key, {})
     entry.update({
@@ -121,8 +122,11 @@ def record_push(obs: Dict[str, Any], open_pr: Optional[int] = None) -> Dict[str,
         "before": obs.get("before", ""), "after": obs.get("after", ""),
         "forced": bool(obs.get("forced", False)), "ts": now,
         "files": _push_files(obs),
+        "exact_sha": exact_sha if exact_sha is not None else False,
     })
     cand["head_sha"] = obs["after"]
+    cand["exact_sha"] = exact_sha if exact_sha is not None else cand.get("exact_sha", False)
+    cand["eval_pending"] = True
     cand["updated_ts"] = now
     if obs.get("compare"):
         cand["compare"] = obs["compare"]

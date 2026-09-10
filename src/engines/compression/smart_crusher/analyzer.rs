@@ -867,6 +867,7 @@ mod tests {
         assert_eq!(r, 0.0);
     }
 
+    #[test]
     fn estimate_reduction_caps_at_0_95() {
         let mut fs: BTreeMap<String, FieldStats> = BTreeMap::new();
         for k in ["a", "b"] {
@@ -893,6 +894,7 @@ mod tests {
         assert_eq!(r, 0.95);
     }
 
+    #[test]
     fn estimate_reduction_smart_sample_no_constants() {
         let mut fs: BTreeMap<String, FieldStats> = BTreeMap::new();
         fs.insert(
@@ -917,6 +919,7 @@ mod tests {
         assert_eq!(r, 0.5);
     }
 
+    #[test]
     fn iso_datetime_pattern_matches() {
         assert!(is_iso_datetime("2025-01-15T12:00:00"));
         assert!(is_iso_datetime("2025-01-15 12:00:00"));
@@ -925,12 +928,14 @@ mod tests {
         assert!(!is_iso_datetime("not a date"));
     }
 
+    #[test]
     fn iso_date_pattern_matches() {
         assert!(is_iso_date("2025-01-15"));
         assert!(!is_iso_date("2025-01-15T12:00:00"));
         assert!(!is_iso_date("2025/01/15"));
     }
 
+    #[test]
     fn python_repr_basics() {
         assert_eq!(python_repr(&Value::Null), "None");
         assert_eq!(python_repr(&json!(true)), "True");

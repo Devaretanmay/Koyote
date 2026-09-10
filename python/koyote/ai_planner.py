@@ -249,7 +249,11 @@ class AIPatchPlanner:
             "4. What must NOT be touched?\n"
             "5. What evidence supports this affected-set determination?\n"
             "6. What existing repository conventions and test commands constrain the solution?\n"
-            "7. Strict Rule: Never invent identifiers, APIs, or configuration. Reference only existing symbols.\n"
+            "7. Is this impact provisional or confirmed, and what additional evidence "
+            "would confirm or invalidate it?\n"
+            "8. Does the current source state still represent the same change, or has "
+            "it evolved since the observed push?\n"
+            "9. Strict Rule: Never invent identifiers, APIs, or configuration. Reference only existing symbols.\n"
             'End with exactly one line: "Confidence: high|medium|low".'
         )
         messages = [{"role": "user", "content": prompt + "\n\n" + self._context_text(

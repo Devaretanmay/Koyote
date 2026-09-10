@@ -219,16 +219,19 @@ pub fn classify_replay(evidence: &ReplayEvidence) -> (CausalReplayClassification
         return (CausalReplayClassification::NonReproducible, false);
     }
 
+    // Post-patch must be GREEN (exit_code == 0) and blast radius must be 0
     if post_patch.exit_code != 0 || !evidence.blast_radius_verified || evidence.unintended_files_modified > 0 {
         return (CausalReplayClassification::Unsafe, false);
     }
 
+    // T1 execution must be GREEN if present
     if let Some(ref t1) = evidence.t1_execution {
         if t1.exit_code != 0 {
             return (CausalReplayClassification::Inconclusive, false);
         }
     }
 
+    // Check that log files exist
     if !Path::new(&baseline.log_path).exists()
         || !Path::new(&drift.log_path).exists()
         || !Path::new(&post_patch.log_path).exists()
@@ -240,6 +243,7 @@ pub fn classify_replay(evidence: &ReplayEvidence) -> (CausalReplayClassification
     (CausalReplayClassification::Reproducible, mergeable)
 }
 
+/// Collect runtime environment diagnostics for audit logging.
 pub fn collect_environment_diagnostics() -> EnvironmentDiagnostics {
     fn run_version(cmd: &str, arg: &str) -> Option<String> {
         Command::new(cmd)
@@ -261,6 +265,7 @@ pub fn collect_environment_diagnostics() -> EnvironmentDiagnostics {
     }
 }
 
+/// Compute structured semantic comparison between Koyote's patch and human diff.
 pub fn compare_diffs_semantically(
     koyote_diff: &str,
     human_diff: &str,
@@ -335,9 +340,11 @@ pub fn compare_diffs_semantically(
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
+    #[test]
     fn test_execute_and_record_command_produces_real_output_and_hash() {
         let temp = std::env::temp_dir().join("koyote_test_exec");
         let _ = fs::create_dir_all(&temp);
@@ -352,6 +359,7 @@ mod tests {
         assert!(log_content.contains("hello world"));
     }
 
+    #[test]
     fn test_classify_replay_rejects_synthetic_placeholders() {
         let evidence = ReplayEvidence {
             case_id: "test".into(),

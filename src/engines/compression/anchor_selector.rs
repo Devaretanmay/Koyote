@@ -748,6 +748,7 @@ mod tests {
         assert!(adjusted.back < base.back);
     }
 
+    #[test]
     fn adjust_weights_both_keywords_no_change() {
         let s = selector();
         let base = AnchorWeights {
@@ -759,6 +760,7 @@ mod tests {
         assert_eq!(adjusted, base);
     }
 
+    #[test]
     fn adjust_weights_no_query_no_change() {
         let s = selector();
         let base = AnchorWeights::default();
@@ -766,12 +768,14 @@ mod tests {
         assert_eq!(s.adjust_weights_for_query(base, Some("")), base);
     }
 
+    #[test]
     fn select_anchors_empty_returns_empty() {
         assert!(selector()
             .select_anchors(&[], 10, DataPattern::Generic, None)
             .is_empty());
     }
 
+    #[test]
     fn select_anchors_no_compression_returns_all() {
         let items: Vec<Value> = (0..5).map(|i| json!({"id": i})).collect();
         let anchors = selector().select_anchors(&items, 10, DataPattern::Generic, None);
@@ -779,6 +783,7 @@ mod tests {
         assert!((0..5).all(|i| anchors.contains(&i)));
     }
 
+    #[test]
     fn select_anchors_includes_first_and_last_for_distributed() {
         let items: Vec<Value> = (0..100).map(|i| json!({"id": i})).collect();
         let anchors = selector().select_anchors(&items, 10, DataPattern::Generic, None);
@@ -793,6 +798,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn select_anchors_dedup_identical_items() {
         let items: Vec<Value> = (0..100).map(|_| json!({"value": "same"})).collect();
         let anchors = selector().select_anchors(&items, 10, DataPattern::Generic, None);
@@ -803,12 +809,14 @@ mod tests {
         );
     }
 
+    #[test]
     fn info_score_zero_for_non_dict() {
         let item = json!("string");
         let all = vec![json!({"a": 1})];
         assert_eq!(calculate_information_score(&item, &all), 0.0);
     }
 
+    #[test]
     fn info_score_in_zero_one_range() {
         let item = json!({"a": 1, "b": 2});
         let all: Vec<Value> = (0..10).map(|i| json!({"a": i})).collect();
@@ -816,6 +824,7 @@ mod tests {
         assert!((0.0..=1.0).contains(&s));
     }
 
+    #[test]
     fn info_score_higher_for_unique_values() {
         let common: Vec<Value> = (0..10).map(|_| json!({"status": "ok"})).collect();
         let mut all = common.clone();

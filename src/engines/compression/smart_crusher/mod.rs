@@ -93,6 +93,7 @@ mod error_keywords_tests {
         }
     }
 
+    #[test]
     fn pinned_membership() {
         let expected = [
             "error",
@@ -114,10 +115,12 @@ mod error_keywords_tests {
     }
 }
 
+#[cfg(test)]
 mod must_keep_tests {
     use super::*;
     use serde_json::json;
 
+    #[test]
     fn must_keep_finds_error_items() {
         let mut items: Vec<Value> = (0..9).map(|i| json!({"id": i, "status": "ok"})).collect();
         items.push(json!({"id": 9, "status": "ERROR", "msg": "FATAL: boom"}));
@@ -125,6 +128,7 @@ mod must_keep_tests {
         assert!(kept.contains(&9));
     }
 
+    #[test]
     fn must_keep_uses_item_strings_when_provided() {
         let items: Vec<Value> = vec![json!({"a": 1}), json!({"a": "exception"})];
         let strings: Vec<String> = items
@@ -137,6 +141,7 @@ mod must_keep_tests {
         assert!(with_cache.contains(&1));
     }
 
+    #[test]
     fn must_keep_finds_structural_outliers() {
         let mut items: Vec<Value> = (0..20)
             .map(|i| json!({"id": i, "kind": "common"}))
@@ -146,6 +151,7 @@ mod must_keep_tests {
         assert!(kept.contains(&20));
     }
 
+    #[test]
     fn must_keep_merges_error_and_outlier_indices() {
         let mut items: Vec<Value> = (0..20)
             .map(|i| json!({"id": i, "kind": "common"}))
@@ -157,12 +163,14 @@ mod must_keep_tests {
         assert!(kept.contains(&21));
     }
 
+    #[test]
     fn must_keep_handles_empty_array() {
         let kept = must_keep(&[], None);
         assert!(kept.is_empty());
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct SmartCrusherConfig {
     pub min_items_to_analyze: usize,
     pub min_tokens_to_crush: usize,
@@ -211,9 +219,11 @@ impl Default for SmartCrusherConfig {
     }
 }
 
+#[cfg(test)]
 mod config_tests {
     use super::*;
 
+    #[test]
     fn defaults_match_python() {
         let c = SmartCrusherConfig::default();
         assert_eq!(c.min_items_to_analyze, 5);

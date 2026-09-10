@@ -51,6 +51,7 @@ pub struct CrushabilityAnalysis {
 }
 
 impl CrushabilityAnalysis {
+    #[allow(dead_code)]
     pub fn skip(reason: impl Into<String>) -> Self {
         CrushabilityAnalysis {
             crushable: false,
@@ -59,6 +60,8 @@ impl CrushabilityAnalysis {
     }
 }
 
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ArrayAnalysis {
     pub item_count: usize,
     pub field_stats: BTreeMap<String, FieldStats>,
@@ -69,6 +72,8 @@ pub struct ArrayAnalysis {
     pub crushability: Option<CrushabilityAnalysis>,
 }
 
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct CompressionPlan {
     pub strategy: CompressionStrategy,
     pub keep_indices: Vec<usize>,
@@ -91,6 +96,8 @@ impl Default for CompressionPlan {
     }
 }
 
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct CrushResult {
     pub compressed: String,
     pub original: String,
@@ -99,6 +106,7 @@ pub struct CrushResult {
 }
 
 impl CrushResult {
+    #[allow(dead_code)]
     pub fn passthrough(content: impl Into<String>) -> Self {
         let s = content.into();
         CrushResult {
@@ -110,9 +118,11 @@ impl CrushResult {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 
+    #[test]
     fn compression_strategy_strings_match_python() {
         assert_eq!(CompressionStrategy::None.as_str(), "none");
         assert_eq!(CompressionStrategy::Skip.as_str(), "skip");
@@ -122,12 +132,14 @@ mod tests {
         assert_eq!(CompressionStrategy::SmartSample.as_str(), "smart_sample");
     }
 
+    #[test]
     fn crushability_skip_helper() {
         let r = CrushabilityAnalysis::skip("too small");
         assert!(!r.crushable);
         assert_eq!(r.reason, "too small");
     }
 
+    #[test]
     fn compression_plan_default_keep_count_matches_python() {
         let p = CompressionPlan::default();
         assert_eq!(p.keep_count, 10);
@@ -135,6 +147,7 @@ mod tests {
         assert!(p.keep_indices.is_empty());
     }
 
+    #[test]
     fn crush_result_passthrough() {
         let r = CrushResult::passthrough("hello");
         assert_eq!(r.compressed, "hello");

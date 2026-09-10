@@ -68,6 +68,11 @@ Two distinct product modes for your team:
 - **Work** (`@hunt repair` / `koyote work`): Autonomous repair worker, sandbox test verification, delivers a verified PR.
 See [GitHub App behavior](docs/GITHUB_APP.md).
 
+Koyote also watches across connected repositories: a push in one repo is an
+observation that can confirm into a Howl Issue on another repo's affected
+work — never an automatic alert. See
+[Cross-Repository Active-Work Impact](docs/CROSS_REPO_WORK_IMPACT.md).
+
 ## The Core Pipeline
 
 ```text

@@ -34,6 +34,26 @@ def test_parse_normal_and_ignores(tmp_path, monkeypatch):
     assert parse_push_payload(deleted) is None
 
 
+def test_parse_forced_push_updates_candidate(tmp_path, monkeypatch):
+    monkeypatch.setenv("KOYOTE_WORK_GRAPH_FILE", str(tmp_path / "wg.json"))
+    first = _push(after="aaa")
+    forced = _push(after="bbb")
+    forced["forced"] = True
+    obs = parse_push_payload(forced)
+    assert obs["forced"] is True and obs["after"] == "bbb"
+    c1 = work_graph.record_push(parse_push_payload(first))
+    c2 = work_graph.record_push(obs)
+    assert c2["candidate_id"] == c1["candidate_id"]
+    assert c2["head_sha"] == "bbb"
+
+
+def test_parse_ignores_non_branch_refs_and_malformed():
+    assert parse_push_payload({"ref": "refs/notes/review"}) is None
+    assert parse_push_payload({"ref": "refs/pull/1/head"}) is None
+    assert parse_push_payload({}) is None
+    assert parse_push_payload({"repository": {"full_name": "acme/x"}}) is None
+
+
 def test_candidate_grouping_and_reeval(tmp_path, monkeypatch):
     monkeypatch.setenv("KOYOTE_WORK_GRAPH_FILE", str(tmp_path / "wg.json"))
     c1 = work_graph.record_push(parse_push_payload(_push(after="aaa")))

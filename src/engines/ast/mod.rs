@@ -1,3 +1,6 @@
+/// endpoint URL, or import. This is not a full AST parser — it is a fast,
+/// zero-dependency callsite finder designed to produce actionable results
+/// without requiring language-specific parser crates.
 mod locator;
 mod types;
 

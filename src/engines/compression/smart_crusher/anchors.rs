@@ -157,46 +157,55 @@ mod tests {
         assert!(!anchors.contains("e.g"));
     }
 
+    #[test]
     fn extracts_quoted_string_double() {
         let anchors = extract_query_anchors(r#"find the "user_name" field"#);
         assert!(anchors.contains("user_name"));
     }
 
+    #[test]
     fn extracts_quoted_string_single() {
         let anchors = extract_query_anchors("find the 'user_name' field");
         assert!(anchors.contains("user_name"));
     }
 
+    #[test]
     fn very_short_quoted_skipped() {
         let anchors = extract_query_anchors(r#"the "x" thing"#);
         assert!(!anchors.contains("x"));
     }
 
+    #[test]
     fn extracts_email() {
         let anchors = extract_query_anchors("contact USER@example.COM please");
         assert!(anchors.contains("user@example.com"));
     }
 
+    #[test]
     fn item_matches_anchors_empty_set() {
         let empty = HashSet::new();
         assert!(!item_matches_anchors(&json!({"a": 1}), &empty));
     }
 
+    #[test]
     fn item_matches_anchor_in_value() {
         let anchors: HashSet<String> = ["alice".to_string()].into_iter().collect();
         assert!(item_matches_anchors(&json!({"name": "Alice"}), &anchors));
     }
 
+    #[test]
     fn item_matches_anchor_in_key() {
         let anchors: HashSet<String> = ["status".to_string()].into_iter().collect();
         assert!(item_matches_anchors(&json!({"status": "ok"}), &anchors));
     }
 
+    #[test]
     fn item_no_match_with_unrelated_anchor() {
         let anchors: HashSet<String> = ["xyz123".to_string()].into_iter().collect();
         assert!(!item_matches_anchors(&json!({"a": "b"}), &anchors));
     }
 
+    #[test]
     fn hostname_blocklist_drops_e_g() {
         let anchors = extract_query_anchors("see e.g for example");
         assert!(!anchors.contains("e.g"));
@@ -204,6 +213,7 @@ mod tests {
         assert!(anchors.contains("api.example.com"));
     }
 
+    #[test]
     fn email_typo_pattern_still_matches_real_emails() {
         let anchors = extract_query_anchors("contact alice@example.com today");
         assert!(anchors.contains("alice@example.com"));
@@ -211,32 +221,38 @@ mod tests {
         assert!(anchors.contains("bob@sub.example.io"));
     }
 
+    #[test]
     fn python_repr_matches_python_str_for_dict() {
         let v = json!({"name": "Alice", "ok": true, "count": 5, "val": null});
         let r = python_repr(&v);
         assert_eq!(r, "{'count': 5, 'name': 'Alice', 'ok': True, 'val': None}");
     }
 
+    #[test]
     fn python_repr_list_uses_space_after_comma() {
         let v = json!([1, 2, "abc", true]);
         assert_eq!(python_repr(&v), "[1, 2, 'abc', True]");
     }
 
+    #[test]
     fn python_repr_nested() {
         let v = json!({"a": [1, {"b": "c"}]});
         assert_eq!(python_repr(&v), "{'a': [1, {'b': 'c'}]}");
     }
 
+    #[test]
     fn item_matches_anchor_with_python_none_form() {
         let anchors: HashSet<String> = ["none".to_string()].into_iter().collect();
         assert!(item_matches_anchors(&json!({"val": null}), &anchors));
     }
 
+    #[test]
     fn item_matches_anchor_avoids_json_null_token() {
         let anchors: HashSet<String> = ["null".to_string()].into_iter().collect();
         assert!(!item_matches_anchors(&json!({"val": null}), &anchors));
     }
 
+    #[test]
     fn python_repr_string_with_single_quote_drift() {
         let v = json!({"k": "it's fine"});
         assert_eq!(python_repr(&v), "{'k': 'it's fine'}");

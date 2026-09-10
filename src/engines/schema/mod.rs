@@ -1,3 +1,6 @@
+/// breaking and non-breaking changes at the endpoint, parameter, and
+/// response-field level. This is the "radar" component that detects
+/// upstream API drift.
 mod diff;
 mod parser;
 mod types;
