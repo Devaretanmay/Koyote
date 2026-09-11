@@ -42,15 +42,32 @@ Zero files touched                                Evidence (BLAKE3) & Trust PR
 
 Koyote cleanly separates **Consult** and **Work** as its primary product abstractions:
 - **Consult (`@howl explain` / `koyote consult`)**: Finds and explains maintenance problems with deep AI reasoning. Explains what changed upstream, what is actually affected across internal callsites, why, what should change, and what must NOT change. Files an advisory **GitHub Issue** (or responds on an existing PR thread). Never touches files, never commits, and never opens PRs.
-- **Work (`@hunt repair` / `koyote work`)**: The autonomous maintenance worker. Synthesizes surgical code repairs via the customer's configured AI provider, runs test suites inside an OS kernel sandbox (Linux Landlock / macOS Seatbelt), and opens a verified **GitHub PR** with BLAKE3 cryptographic receipts only when tests pass (`exit 0`).
+- **Work (`koyote hunt <id>` / `koyote work`)**: The autonomous maintenance worker. Starts from a finding ID, rebuilds live context, reasons with AI, authors the patch with AI, verifies in an isolated sandbox worktree at the exact SHA with the project's real test command, and opens a **GitHub PR** only for sealed, green, scope-clean repairs. Anything else fails closed with no PR.
+
+## 1c. Hunt internals (ports + sealed provenance)
+
+Hunt's core loop (`koyote.hunt.run_hunt`) talks only to capability ports
+(`koyote.hunt_ports`): `ContextProvider / RepairReasoner / PatchAuthor /
+SandboxProvider / Verifier / RepairInterpreter / PRPublisher`. Deterministic
+code provides evidence and execution; it cannot author repairs.
+
+Two frozen, sealed types enforce the boundary: `AIAuthoredPatch`
+(constructible only via `seal_ai_patch`, carrying `author="ai"`, model
+identity, diff, and admission provenance) and `VerifiedRepair` (mintable
+only via `seal_verified_repair`, which derives acceptance from sealed
+patches, real command + exit 0, convinced interpretation, and its own
+scope evaluation). Promotion re-checks seal + sandbox containment;
+`decide_pr` accepts only the token. One Hunt holds a repo-level lock
+(`.koyote/hunt.lock`) at a time.
 
 ## 2. Core types
 
 | Type | Module | Role |
 |---|---|---|
 | `ChangeSource` | `koyote.change_source` | Names the depended-upon system: `kind` (`sdk`, `external_api`, `openapi`, `graphql`, `protobuf`, `webhook`, `mcp_server`, `internal_service`), `identity`, versions or `contract_hash` |
-| `Detection` | `koyote.change_source` | Read-only outcome: `NO_IMPACT`, `IMPACT_AI`, `IMPACT_QUARANTINE` (+ `ai_dependent` flag for checks needing reasoning). `IMPACT_DIRECT` accepted for backward compat but never emitted |
-| `Decision` | `koyote.intelligence` | Internal routing: `AI / QUARANTINE` + `confidence`, `estimated_tokens`, `expected_blast_radius`, `verification_required`. AI is the exclusive patch author. Never a CLI flag |
+| `Detection` | `koyote.change_source` | Read-only outcome: `NO_IMPACT`, `IMPACT_AI`, `IMPACT_QUARANTINE` (+ `ai_dependent` flag for checks needing reasoning) |
+| `Decision` | `koyote.intelligence` | Internal routing: `AI / QUARANTINE` + `confidence`. AI is the exclusive patch author. Never a CLI flag |
+| `AIAuthoredPatch` / `VerifiedRepair` | `koyote.hunt_ports` | Sealed capability types: AI-only patch admission and verified-only PR publication |
 | `KBEntry` | `koyote.knowledge` | Repository memory at `.koyote/knowledge/{kind}/{identity}/{contract}.json` (legacy provider paths still read). Executable patterns + test recipes + evidence + quarantined `failed_patterns` |
 
 ## 3. State on disk (per repository)
@@ -74,7 +91,7 @@ repositories with `PENDING → INDEXED → READY`, provider association, index t
 - No `exit 0` fallbacks, no default-pass counters, no fake badges.
 - Unverified AI guesses never enter trusted knowledge.
 - Webhook serving without a secret is a hard error.
-- Secrets never enter repo state, logs, or knowledge.
+- Secrets are scrubbed before provider submission and audit persistence (`koyote.redact`); credential files are 0600.
 - Koyote never cries wolf: no alert, badge, or pass is ever issued without the execution behind it.
 
 ## 5. Deliberately not built yet

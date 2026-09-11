@@ -25,15 +25,15 @@
 ## 3. Run with Docker
 
 ```bash
-docker build -f docker/Dockerfile.app -t koyote-app:1.1.0 .
-docker run -d --name koyote -p 8080:8080 --env-file .env -v koyote-data:/data koyote-app:1.1.0
+docker build -f docker/Dockerfile.app -t koyote-app:1.1.3 .
+docker run -d --name koyote -p 8080:8080 --env-file .env -v koyote-data:/data koyote-app:1.1.3
 ```
 
 With background monitoring (poll READY repos every 5 minutes):
 
 ```bash
 docker run -d --name koyote -p 8080:8080 --env-file .env -v koyote-data:/data \
-  koyote-app:1.1.0 sh -c "koyote app serve --port ${PORT:-8080} --watch 300"
+  koyote-app:1.1.3 sh -c "koyote app serve --port ${PORT:-8080} --watch 300"
 ```
 
 ## 4. Run on bare metal

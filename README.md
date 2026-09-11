@@ -4,18 +4,16 @@
 
 ### Your codebase has a second author: the outside world. Koyote reviews its pull requests.
 
-![version](https://img.shields.io/badge/version-1.1.0-blue) ![license](https://img.shields.io/badge/license-Apache--2.0-green) ![python](https://img.shields.io/badge/python-3.10%2B-yellow) ![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)
+![version](https://img.shields.io/badge/version-1.1.3-blue) ![license](https://img.shields.io/badge/license-Apache--2.0-green) ![python](https://img.shields.io/badge/python-3.10%2B-yellow) ![platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)
 
 **APIs drift. SDKs break. Koyote detects it, repairs it, and proves it — before your CI goes red.**
 
 ```bash
-git clone https://github.com/Devaretanmay/Koyote && cd Koyote
-pip install .
+pip install koyote
 koyote check /path/to/your-repo   # read-only audit, no AI key needed
 ```
 
 60 seconds to your first risk register. AI repair is opt-in (`koyote auth`).
-PyPI one-liner (`pip install koyote`) lands with the public beta.
 
 [Quickstart](docs/QUICKSTART.md) | [CLI Reference](docs/CLI.md) | [Architecture](docs/ARCHITECTURE.md) | [Validation Guide](docs/VALIDATION_GUIDE.md) | [Join the beta](https://github.com/Devaretanmay/Koyote/issues)
 
@@ -57,10 +55,9 @@ AI reasons; native tools provide evidence and execute/verify
 ```bash
 koyote auth              # Connect BYOK AI provider (Anthropic, OpenAI, Ollama)
 koyote doctor            # GitHub / AI / Indexed / Knowledge / Tests / Monitoring
-koyote check .           # Read-only AST evidence scan
 koyote check .           # Read-only drift & impact audit
 koyote consult .         # Consult mode: AI assessment as a GitHub Issue, modifies nothing
-koyote work .            # Work mode: AI repair, sandbox verification, and PR delivery
+koyote hunt <id>         # Work mode: AI repair from a finding, sandbox verification, PR delivery
 ```
 
 Two distinct product modes for your team:
@@ -159,24 +156,29 @@ Active Graph Edges:      28
 
 ---
 
-## 3. Autonomous Continuous Maintenance (`koyote fix`)
+## 3. Autonomous Repair (`koyote hunt`)
 
-When upstream providers release breaking changes, Koyote detects the drift, reasons about impact with AI, generates verified repairs, matches your team's code formatting (`prettier`/`ruff`), validates local tests, and opens a Developer Trust PR:
+Every `koyote check` finding carries an ID. Hunt starts from that finding —
+rebuilding live context (branch, exact SHA, active work, callsites, tests,
+verified memory) — then reasons with AI, authors the patch with AI, verifies
+it in an isolated sandbox worktree, and refuses loudly when correctness
+cannot be established:
 
 ```bash
-# Autonomous migration for a target provider:
-koyote fix . --provider stripe
+koyote check .                # read-only audit; note the finding ID
+koyote hunt stripe-3a9c79     # full reasoning → repair → sandbox → verify cycle
 
-# Custom version bump:
-koyote fix . --provider openai --from v3.28.0 --to v4.0.0 --create-pr --repo owner/repo
+# Provider-driven form (same engine, explicit target):
+koyote work . --provider stripe
+koyote work . --provider openai --from v3.28.0 --to v4.0.0 --create-pr --repo owner/repo
 ```
 
-### What `koyote fix` guarantees:
-1. **AI-Authored Repair**: AI reasons about affected callsites, generates targeted source changes, and validates impact.
-2. **Local Formatter Bridge**: Formats changed files with your project's `prettier`, `ruff`, or `biome`.
-3. **Local Test Verification**: Executes test suites and rejects patches if tests remain red.
-4. **Zero Blast Radius**: Verifies that 0 unintended files were modified.
-5. **Developer Trust PR**: Generates audit-grade PR markdown containing primary sources, exact callsites, test receipts, and rollback hashes.
+### What Hunt guarantees:
+1. **AI-Authored Repair**: AI reasons about affected callsites, generates targeted source changes, and validates impact. No deterministic rewrite rules, templates, or regex fixers author code — ever.
+2. **Isolated Verification**: Every repair executes in a sandbox worktree at the exact SHA with the project's real test command. No fake passes, no forced exits.
+3. **Zero Blast Radius**: Verifies that 0 unintended files were modified; scope violations fail closed.
+4. **Fail-Closed Refusals**: Unverified repairs produce no PR — "could not safely verify" with the evidence attached.
+5. **Verified-Only PRs**: Only a sealed, green, scope-clean repair may proceed to a Developer Trust PR (explicit approval, or auto-PR where repository policy enables it).
 
 ---
 
@@ -187,7 +189,7 @@ reproduced the breaking bump as a red build, repaired it autonomously, and
 returned the suite to green with zero unintended files touched. Refusals are
 loud and empty-handed — a repair that can't be proven is a repair not shipped.
 
-Every commit is gated: **527 Rust + 357 Python tests**, lint-clean.
+Every commit is gated: **516 Rust + 460 Python tests**, lint-clean.
 See the [Validation Guide](docs/VALIDATION_GUIDE.md)
 for the full protocol.
 
@@ -195,7 +197,7 @@ for the full protocol.
 
 ## 4. Controlled Execution & Sandboxed Verification
 
-Koyote provides **controlled, reproducible execution** across local kernel sandboxes (macOS Seatbelt, Linux Landlock), Docker, and CI runners:
+Koyote provides **controlled, reproducible execution** across local kernel sandboxes (macOS Seatbelt, Linux Landlock) and Docker:
 - **Zero-Exfiltration Isolation**: Credentials (`~/.ssh`, `~/.aws`, keychains) denied at the kernel boundary.
 - **Execution-Evidence Compression**: Native Rust engines distill massive test outputs down to high-signal failure traces and stack traces for PR evidence.
 - **2ms Instant Undo**: Pre-execution BLAKE3 hash snapshots enable physical rollback of modified and generated files in 2 milliseconds.
@@ -240,7 +242,8 @@ Vendor SDK migrations are the working wedge; other contract kinds are representa
 connectors yet — they fail closed to quarantine instead of guessing.
 
 Under the hood, Koyote is an AI maintenance agent with deterministic tools: a code graph,
-repository memory, verified rewrite patterns, sandbox execution, and a fail-closed verifier.
+verified maintenance memory (trusted successes plus a failure avoid-list),
+sandbox execution, and a fail-closed verifier.
 Repeated work reuses verified knowledge instead of re-reasoning, so the system gets faster,
 cheaper, and more precise the longer it watches a repository.
 

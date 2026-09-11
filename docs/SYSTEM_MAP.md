@@ -83,9 +83,9 @@ flowchart TD
 
 | Layer | Status | Pinned by |
 |---|---|---|
-| 527 Rust tests | green | `cargo test --all-targets` |
-| 357 Python tests | green | `pytest tests/` |
-| ruff + hygiene gate | clean | `scripts/run_all_tests.py` (step 0–1) |
+| 516 Rust tests | green | `cargo test --lib` |
+| 460 Python tests | green | `pytest tests/` |
+| ruff + cargo + pytest gate | clean | `scripts/run_all_tests.py` (lint → rust → python) |
 | clippy | 0 warnings | `cargo clippy --all-targets` |
 | Tier-1 controlled fixtures | done | trials/fixtures (stripe, openai, clerk, aws, sentry) |
 | Tier-2 live demos | done | purpose-built demo repos |

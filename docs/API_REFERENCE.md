@@ -1,6 +1,6 @@
 # Koyote Python & Engine API Reference
 
-**Version:** 1.1.2  
+**Version:** 1.1.3  
 **Package:** `koyote` (PyPI)
 
 ---
@@ -63,7 +63,6 @@ Low-level process execution runner that applies kernel sandbox (Seatbelt / Landl
 
 ### `from koyote import autopatch`
 - `plan_maintenance(old_spec: str, new_spec: str, repo_root: str = ".", config: ScanConfig = None) -> MaintenancePlan`: Generates breaking-change diff, scans callsites, and computes patch targets as evidence for AI reasoning.
-- `apply_patch(repo_root: str, plan: MaintenancePlan, dry_run: bool = True) -> List[PatchResult]`: Evaluates AST transformation targets (dry-run only; AI must author all source changes).
 - `synthesize_contracts(api_name: str, old_ver: str, new_ver: str, specs: List[VerificationSpec], lang: str = "ts") -> str`: Synthesizes Vitest/pytest contract test suites.
 
 ### `from koyote.graph import build_dependency_graph, audit_dependency_graph`
@@ -80,10 +79,10 @@ Low-level process execution runner that applies kernel sandbox (Seatbelt / Landl
 - `TriggerContext`: Structured event context describing the trigger source (e.g. pull request, scheduled watch loop, webhook event).
 
 ### `from koyote.ai_planner import AIPatchPlanner`
-- `AIPatchPlanner`: Synthesizes AST transformations and AI-guided code repairs, consulting verified knowledge memory before making model calls.
+- `AIPatchPlanner`: Authors surgical repairs via the configured LLM (SEARCH/REPLACE blocks applied by exact string match only — never regex, AST, or template rewrites); consults verified knowledge memory before model calls.
 
-### `from koyote.maintenance_agents import ImpactAnalyst`
-- `ImpactAnalyst`: Traces dependencies through wrappers to affected callsites. `analyze_impact_for(repo, source)` matches any `ChangeSource` identity against wrapper metadata, callsite patterns, and file paths; `analyze_impact(repo, provider)` is the preserved SDK branch.
+### `from koyote.maintenance_agents import analyze_impact, ImpactAnalysisResult`
+- `analyze_impact(repo_dir, provider_name) -> ImpactAnalysisResult`: Matches the provider identity against wrapper metadata, callsite patterns, and file paths; returns affected files, wrapper files, and matched callsites as evidence.
 
 ---
 
@@ -91,13 +90,13 @@ Low-level process execution runner that applies kernel sandbox (Seatbelt / Landl
 
 ### `from koyote.change_source import ChangeSource, Detection`
 - `ChangeSource(kind, identity, version_from, version_to, contract_hash, origin)`: kinds `external_api, sdk, openapi, graphql, protobuf, webhook, mcp_server, internal_service`. Helpers: `ChangeSource.sdk(provider, …)`, `.provider`, `.key()`.
-- `Detection(source, outcome, reason, affected_files, callsite_count, ai_dependent, confidence)`: outcomes `NO_IMPACT / IMPACT_AI / IMPACT_QUARANTINE` (fail-closed). `IMPACT_DIRECT` is accepted for backward compatibility but never emitted.
+- `Detection(source, outcome, reason, affected_files, callsite_count, ai_dependent, confidence)`: outcomes `NO_IMPACT / IMPACT_AI / IMPACT_QUARANTINE` (fail-closed).
 
 ### `from koyote.drift import detect_drift, detect_changes`
 - `detect_changes(repo_dir, provider_name=None) -> List[Detection]`: read-only classification — never patches.
 
 ### `from koyote.intelligence import KoyoteIntelligence, Decision, resolve_migration`
-- `Decision(strategy, reason, confidence, estimated_tokens, expected_blast_radius, verification_required)`: strategies `AI / QUARANTINE`. AI credentials present → `AI`; absent → `QUARANTINE` (fail-closed, no source modification).
+- `Decision(strategy, reason, elapsed_ms, provider, from_version, to_version, confidence)`: strategies `AI / QUARANTINE`. AI credentials present → `AI`; absent → `QUARANTINE` (fail-closed, no source modification).
 - `decide_for_source(repo_dir, source)`: routes any `ChangeSource`; AI-if-credentials, else quarantine.
 
 ### `from koyote.providers.registry import find_migration_for`
@@ -128,5 +127,26 @@ Low-level process execution runner that applies kernel sandbox (Seatbelt / Landl
 - `consult` (report only) or `work` (repair, default) in `.koyote/config.yaml`, plus `ignore_paths` / `exclude_labels` PR filters. See [GitHub App behavior](GITHUB_APP.md).
 
 ### `from koyote.credentials import save_credentials, load_credentials, has_valid_credentials`
-- All accept optional `(installation_id, repo)` scope: env → scoped file → global file. Secrets never enter repo state, logs, or knowledge.
+- All accept optional `(installation_id, repo)` scope: env → scoped file → global file. Credential files are 0600. Secrets are scrubbed before provider submission and audit persistence (see `koyote.redact`).
+
+---
+
+## 5. Hunt Autonomous Repair
+
+Hunt starts from a `koyote check` finding ID and runs the full
+reasoning → repair → sandbox → verification lifecycle. AI authors every
+semantic change; deterministic code provides evidence and execution only.
+
+### `from koyote.hunt import run_hunt, list_findings, resolve_finding`
+- `list_findings(repo_dir) -> List[HuntFinding]`: live re-detection; IDs derive from repo-relative paths so spellings (`/tmp/x` vs `/private/tmp/x`) resolve identically.
+- `resolve_finding(repo_dir, ref)`: accepts a finding ID, provider name, or `issue:<n>` reference. Stored IDs are hints; context is always rebuilt live.
+- `run_hunt(repo_dir, finding_ref, create_pr=False, github_repo=None, auto_approve_pr=False, max_iterations=3, ports=None, lock_timeout_s=120.0) -> HuntReport`: bounded AI-directed iterations; fails closed with no PR unless a sealed repair verifies green and scope-clean. One Hunt per repository at a time (repo-level lock); concurrent attempts serialize or refuse loudly.
+
+### `from koyote.hunt_ports import AIAuthoredPatch, VerifiedRepair, seal_ai_patch, seal_verified_repair, HuntPorts`
+- `AIAuthoredPatch` (frozen, sealed): constructible only via `seal_ai_patch()`; carries `author="ai"`, model identity, diff, and admission provenance.
+- `VerifiedRepair` (frozen capability token): mintable only via `seal_verified_repair()`, which derives acceptance from sealed patches, real command + exit 0, convinced interpretation, and its own scope evaluation. `decide_pr` / `PRPublisher.publish` accept nothing else.
+- `HuntPorts`: `ContextProvider / RepairReasoner / PatchAuthor / SandboxProvider / Verifier / RepairInterpreter / PRPublisher` protocols. Future extensions implement protocols; the loop never imports concrete repair modules.
+
+### `from koyote.redact import redact_secrets, redact_record`
+- Heuristic scrubbing of provider keys, tokens, and private-key blocks before LLM submission and audit persistence. Precision over recall; extend centrally, never per-callsite.
 

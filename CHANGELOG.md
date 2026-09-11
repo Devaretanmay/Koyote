@@ -2,6 +2,26 @@
 
 All notable changes to Koyote are documented here.
 
+## [1.1.3] - 2026-09-11
+
+### Added
+- **Hunt autonomous repair agent (`koyote/hunt.py`, `koyote hunt <id>`)**: finding-driven lifecycle — live context reconstruction, structured 14-question AI reasoning with per-file intent, AI-authored patches, isolated exact-SHA sandbox worktrees, real verification, skeptical AI interpretation, bounded AI-directed iteration, fail-closed refusals, verified-only PRs, and a full JSON audit trail per finding.
+- **Capability ports + sealed provenance (`koyote/hunt_ports.py`)**: `ContextProvider / RepairReasoner / PatchAuthor / SandboxProvider / Verifier / RepairInterpreter / PRPublisher` protocols; frozen `AIAuthoredPatch` (sealable only via `seal_ai_patch`) and `VerifiedRepair` capability token (mintable only via `seal_verified_repair`, which derives acceptance from evidence instead of trusting caller flags).
+- **Concurrency + promotion integrity**: repo-level `HuntLock` serializes runs (loud refusal on timeout); post-promotion verification re-reads promoted files and rejects unexpected worktree changes; sandbox binding (repo/SHA/worktree) checked before promotion; symlinks refused at the promotion boundary.
+- **Secret redaction (`koyote/redact.py`)**: provider keys, tokens, and private-key blocks are scrubbed before LLM submission and before audit persistence.
+- **Registry-basis labeling**: findings carry explicit `basis`/evidence labels (registry-inferred, never observed at the vendor); audits record `evidence_limits` marking coverage relevance, failure attribution, and minimality as AI-judged.
+
+### Changed
+- **Finding IDs are repo-relative**: same checkout yields the same ID across symlink/relative/absolute path spellings.
+- **Work-family CLI commands share one parser** (`aliases=["fix", "maintain", "update", "hunt", "@hunt"]`); consult family likewise (`aliases=["howl", "@howl"]`).
+
+### Removed
+- **Framework hook adapters** (`hooks/langchain.py`, `hooks/crewai.py`, `hooks/autogen.py`, `hooks/data_agent.py`): zero in-repo consumers.
+- **Surgical AST patcher engine** (`engines/autopatch/patcher.rs`, its binding, and the `autopatch.apply_patch` wrapper): no product caller; a contract test now pins the deterministic patch surface as absent.
+- **Dead native modules** (`runtime/snapshot.rs`, `runtime/credential.rs`) and the **CI runner** (`koyote/ci/`): no callers.
+- **Dead CLI machinery**: uncalled workspace-shim writer and templates; removed `estimated_tokens` / `expected_blast_radius` / `verification_required` from `Decision`.
+- **Bespoke test gates** in `scripts/run_all_tests.py` (comment-density, inline-import, demo-file checks): `ruff` + `cargo test` + `pytest` remain.
+
 ## [1.1.1] - 2026-09-09
 
 ### Added

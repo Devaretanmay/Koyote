@@ -14,8 +14,8 @@ Core Maintenance Commands:
   koyote connect [owner/repo]     Connect GitHub account, choose repository, and issue Repository Key
   koyote active [owner/repo]      Show or switch the active repository working context
   koyote status                   Show current workspace and repository connection status
-  koyote consult [path]           Consult mode: assess with AI reasoning, file Issue, modify nothing (alias: howl)
-  koyote work [path] [--provider] Work mode: repair, verify in sandbox, report evidence, open PR (alias: hunt, fix)
+  koyote consult [path]           Consult mode: assess with AI reasoning, file Issue, modify nothing (aliases: howl, @howl)
+  koyote work [path] [--provider] Work mode: repair from a finding ID or provider, sandbox-verify, report evidence, open PR (aliases: fix, maintain, update, hunt, @hunt)
   koyote disconnect [owner/repo]  Disconnect repository registration and clear active working context
 
 Diagnostic & Advanced Commands:
@@ -290,12 +290,21 @@ koyote graph . --json
 
 ---
 
-### `koyote work [root_dir]` (alias: `hunt`, `fix`, `maintain`, `update`)
-Executes an autonomous continuous maintenance cycle: Koyote's AI reasons over the repository,
-the change, and maintenance memory, then authors verified repairs, formats with local tools
-(`prettier`/`ruff`), runs repository tests, verifies zero blast radius, and reports evidence.
-AI is the sole repair author; unsafe repairs are refused loudly with zero files touched.
-There is no engine flag — strategy is internal:
+### `koyote hunt <finding-id>` (aliases: `fix`, `maintain`, `update`, `work`, `@hunt`)
+Hunt starts from a finding ID printed by `koyote check` — then rebuilds live
+context (branch, exact SHA, active work, callsites, tests, verified memory),
+reasons with AI, authors the patch with AI, verifies in an isolated sandbox
+worktree, and fails closed with no PR unless the repair verifies green and
+scope-clean. One Hunt runs per repository at a time (a second attempt waits
+on a repo lock, then refuses loudly instead of overlapping):
+
+```bash
+koyote check .                # note the finding ID, e.g. stripe-3a9c79
+koyote hunt stripe-3a9c79     # full reasoning → repair → sandbox → verify cycle
+koyote hunt stripe-3a9c79 --create-pr --repo owner/repo
+```
+
+The provider-driven form runs the same engine with an explicit target:
 
 ```bash
 koyote work .                       # Auto-detect provider from manifests
@@ -305,6 +314,9 @@ koyote work . --detect              # Detect installed API providers
 koyote work . --show-pr             # Preview Developer Trust PR body
 koyote work . --create-pr --repo owner/repo
 ```
+
+All work-family names share one parser (`aliases=[...]`); `args.command`
+carries the name actually typed.
 
 ### `koyote consult [path] [--repo owner/repo]`
 Same AI reasoning as `fix` — codebase context, change context, maintenance memory, impact

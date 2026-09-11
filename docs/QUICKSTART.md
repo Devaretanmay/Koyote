@@ -26,11 +26,11 @@ koyote auth              # Connect your BYOK AI provider (Anthropic, OpenAI, Oll
 Outputs your repository readiness:
 
 ```text
-✓ GitHub connected (account: Devaretanmay)
-✓ Repository detected: acme/payments
-✓ Repository indexed (3 providers detected, 14 callsites mapped)
-✓ AI provider: Anthropic (claude-3-5-sonnet)
-✓ Maintenance memory initialized (.koyote/knowledge/)
+[OK] GitHub connected (account: Devaretanmay)
+[OK] Repository detected: acme/payments
+[OK] Repository indexed (3 providers detected, 14 callsites mapped)
+[OK] AI provider: Anthropic (claude-3-5-sonnet)
+[OK] Maintenance memory initialized (.koyote/knowledge/)
 
 READY
 
@@ -65,7 +65,8 @@ as a GitHub Issue. Graduate to Work (Hunt) when the reasoning earns it.
 
 ```bash
 koyote consult . --repo owner/repo   # Assess only, files an Issue (Howl)
-koyote work .                        # Repair, verify, report (Hunt)
+koyote check .                       # note the finding ID, e.g. stripe-3a9c79
+koyote hunt stripe-3a9c79            # Repair, verify, report (Hunt)
 ```
 
 See [GitHub App behavior](GITHUB_APP.md) for modes, triggers, and bot config.
@@ -106,7 +107,7 @@ koyote commit  # Commit to Git with verified provenance trailers
 ## 7. Key Guarantees
 
 - **External Intelligence**: Full-codebase AST mapping of providers, contracts, wrappers, and callsites.
-- **Continuous Maintenance**: AI-authored repairs with local formatter matching and automated Developer Trust PRs.
+- **Continuous Maintenance**: AI-authored repairs with sandbox verification and automated Developer Trust PRs (verified repairs only; refusals are loud and empty-handed).
 - **Kernel Enforcement**: Built on native OS isolation (macOS Seatbelt / Linux Landlock).
 - **Credential Protection**: `~/.ssh`, `~/.aws`, `~/.config/gcloud`, git credentials, and keychains are denied by default.
 - **Instant Rollback**: Hash-based BLAKE3 file snapshots allow physical restoration of modified and deleted files in 2ms.
