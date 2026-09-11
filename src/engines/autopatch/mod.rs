@@ -2,7 +2,6 @@ pub mod contracts;
 pub mod evidence;
 pub mod inventory;
 pub mod manifest_lockfile;
-pub mod patcher;
 mod planner;
 pub mod policy;
 pub mod report;
@@ -20,7 +19,6 @@ pub use manifest_lockfile::{
     detect_package_manager, parse_cargo_lock, parse_package_json_manifest, parse_package_lock_json,
     parse_pnpm_lock, parse_yarn_lock, resolve_dependency, PackageManager, ResolvedDependency,
 };
-pub use patcher::{apply_patch_to_source, generate_unified_diff, patch_plan_targets, PatchResult};
 pub use planner::plan_maintenance;
 pub use policy::{SafetyDecision, SafetyPolicy};
 pub use report::{render_markdown, render_trust_report_cli};

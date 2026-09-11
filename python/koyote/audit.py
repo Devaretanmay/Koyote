@@ -12,6 +12,84 @@ from typing import Any, Dict
 from koyote.graph import audit_dependency_graph, build_dependency_graph
 
 
+def _strip_strings_and_comments(line: str) -> str:
+    """Remove string literals and line comments for evidence checks."""
+    out: list[str] = []
+    i, n = 0, len(line)
+    quote: str | None = None
+    while i < n:
+        ch = line[i]
+        if quote is not None:
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch in ("'", '"', "`"):
+            quote = ch
+            i += 1
+            continue
+        if ch == "/" and i + 1 < n and line[i + 1] == "/":
+            break
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def is_code_evidence(callsite: dict[str, Any]) -> bool:
+    """True when a callsite match is real code, not prose inside strings.
+
+    Structured AST kinds always count. Otherwise the matched pattern must
+    still occur after stripping string literals and comments from the line.
+    """
+    if callsite.get("kind"):
+        return True
+    pattern = (callsite.get("matched_pattern") or "").strip()
+    line = callsite.get("line_content") or ""
+    if not pattern or not line:
+        return False
+    return pattern.lower() in _strip_strings_and_comments(line).lower()
+
+
+def require_structural_evidence(summary: dict[str, Any], repo_root: str) -> dict[str, Any]:
+    """Drop at-risk findings with no structural (AST-kind) callsites.
+
+    The graph locator also reports bare name/URL substring hits (e.g. a URL
+    constant or prose inside println!) with no AST kind. Those are not code
+    callsites and must never present as CRITICAL breaking drift. Items with
+    only such references move to healthy with an explicit note.
+    """
+    try:
+        graph = build_dependency_graph(repo_root)
+    except Exception:
+        return summary
+    structural_files: set[str] = set()
+    for c in graph.get("callsites", []) or []:
+        if c.get("file_path") and is_code_evidence(c):
+            structural_files.add(os.path.abspath(c["file_path"]))
+    kept = []
+    for item in summary.get("at_risk", []):
+        files = [f for f in item.get("affected_files", [])
+                 if os.path.abspath(os.path.join(repo_root, f)) in structural_files]
+        if files:
+            item["affected_files"] = files
+            item["callsites_count"] = len(files)
+            kept.append(item)
+            continue
+        summary.setdefault("healthy", []).append({
+            "provider_name": item.get("provider_name", "Unknown"),
+            "package_name": item.get("package_name", ""),
+            "current_version": item.get("current_version", "unknown"),
+            "status_message": ("Name-only references (URLs/docs/strings); "
+                               "no code callsites require migration."),
+            "callsite_count": 0,
+        })
+    summary["at_risk"] = kept
+    return summary
+
+
 def render_audit_cli(summary: dict[str, Any]) -> str:
     lines = []
     lines.append("=" * 80)
@@ -194,6 +272,7 @@ def changed_since_index(repo_root: str = ".") -> dict[str, Any]:
 def run_audit(repo_root: str = ".", output_format: str = "cli", write_graph: bool = False) -> str:
     prev = read_index_state(repo_root) if write_graph else None
     summary = audit_dependency_graph(repo_root)
+    summary = require_structural_evidence(summary, repo_root)
 
     if write_graph:
         graph = build_dependency_graph(repo_root)

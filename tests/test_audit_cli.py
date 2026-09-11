@@ -64,7 +64,7 @@ def test_cli_at_howl_alias():
     result = _run_koyote_cli(["@howl", "--help"])
     assert result.returncode == 0
     assert "usage:" in result.stdout
-    assert "@howl" in result.stdout
+    assert "consult" in result.stdout  # alias routes to the consult parser
 
 
 def test_cli_at_hunt_alias():
@@ -73,3 +73,28 @@ def test_cli_at_hunt_alias():
     assert "KOYOTE AUTONOMOUS MAINTENANCE LOOP" in result.stdout
 
 
+
+
+def test_audit_drops_string_only_drift(tmp_path):
+    import os
+    from koyote import audit as audit_mod
+    repo = str(tmp_path / "r")
+    os.makedirs(os.path.join(repo, "src"))
+    with open(os.path.join(repo, "src", "proxy.rs"), "w") as f:
+        f.write('const URL: &str = "https://api.openai.com";\n')
+    out = audit_mod.run_audit(repo_root=repo, output_format="cli")
+    assert "[CRITICAL]" not in out
+
+
+def test_is_code_evidence_classifier():
+    from koyote.audit import is_code_evidence
+    assert is_code_evidence({"kind": "Import", "matched_pattern": "x",
+                             "line_content": "import x"}) is True
+    assert is_code_evidence({"kind": None, "matched_pattern": "stripe",
+                             "line_content": "return stripe.charges.create({...});"}) is True
+    assert is_code_evidence({"kind": None, "matched_pattern": "api.openai.com",
+                             "line_content": 'const U: &str = "https://api.openai.com";'}) is False
+    assert is_code_evidence({"kind": None, "matched_pattern": "Anthropic",
+                             "line_content": 'println!("  For Anthropic models:");'}) is False
+    assert is_code_evidence({"kind": None, "matched_pattern": "",
+                             "line_content": "code"}) is False

@@ -172,38 +172,12 @@ def test_workflow_validate_and_order():
 
 
 
-def test_apply_patch_sdk():
-    with tempfile.TemporaryDirectory() as tmpdir:
-        file_path = os.path.join(tmpdir, "billing.ts")
-        original = "import Stripe from 'stripe';\nconst c = stripe.charges.create({\n  amount: 2000,\n  currency: 'usd',\n});\n"
-        with open(file_path, "w") as f:
-            f.write(original)
+def test_no_deterministic_patcher_surface():
+    """No AST patch engine may exist behind the SDK: repairs are AI-authored."""
+    assert not hasattr(autopatch, "apply_patch")
+    from koyote import _core
 
-        plan = {
-            "status": "ActionRequired",
-            "api_name": "Stripe API",
-            "old_version": "2024-06-01",
-            "new_version": "2026-02-15",
-            "breaking_changes": 1,
-            "total_affected_files": 1,
-            "total_affected_callsites": 1,
-            "impacted_endpoints": [],
-            "patch_targets": [{
-                "file_path": file_path,
-                "line_numbers": [2],
-                "reason": "POST /v1/charges parameter 'amount' type changed from 'integer' to 'string'",
-                "upstream_change": "Parameter 'amount' type changed from 'integer' to 'string'",
-            }],
-            "verification_specs": [],
-        }
-
-        patches = autopatch.apply_patch(tmpdir, plan)
-        assert len(patches) == 1
-        assert patches[0]["success"]
-        assert "amount: String(2000)" in patches[0]["patched_content"]
-        with open(file_path) as f:
-            content = f.read()
-            assert content == original
+    assert not hasattr(_core, "patch_apply")
 
 
 def test_false_positive_regressions():

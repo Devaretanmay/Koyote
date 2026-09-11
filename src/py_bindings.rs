@@ -133,15 +133,6 @@ fn trust_report_render(plan_json: &str) -> PyResult<String> {
 }
 
 #[pyfunction]
-fn patch_apply(repo_root: &str, plan_json: &str, dry_run: bool) -> PyResult<String> {
-    let plan: MaintenancePlan =
-        serde_json::from_str(plan_json).map_err(|e| PyValueError::new_err(e.to_string()))?;
-    let results = crate::engines::autopatch::patch_plan_targets(repo_root, &plan, dry_run)
-        .map_err(PyValueError::new_err)?;
-    serde_json::to_string_pretty(&results).map_err(|e| PyValueError::new_err(e.to_string()))
-}
-
-#[pyfunction]
 #[pyo3(signature = (repo_root="."))]
 fn dependency_graph_build(repo_root: &str) -> PyResult<String> {
     let graph = crate::engines::graph::build_external_dependency_graph(repo_root, None);
@@ -170,7 +161,6 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(workflow_execution_order, m)?)?;
     m.add_function(wrap_pyfunction!(inventory_scan, m)?)?;
     m.add_function(wrap_pyfunction!(trust_report_render, m)?)?;
-    m.add_function(wrap_pyfunction!(patch_apply, m)?)?;
     m.add_function(wrap_pyfunction!(dependency_graph_build, m)?)?;
     m.add_function(wrap_pyfunction!(dependency_graph_audit, m)?)?;
     Ok(())

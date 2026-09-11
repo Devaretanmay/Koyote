@@ -77,7 +77,7 @@ def _consumer_setup(tmp_path, monkeypatch, active=True):
             time.time() - work_graph.DEFAULT_ACTIVE_WINDOW_S - 1)
         work_graph.save_graph(g)
     monkeypatch.setattr(cross_repo, "scan_callsites",
-                        lambda d, cfg: {"callsites": [{"file_path": "client.ts"}]}
+                        lambda d, cfg: {"callsites": [{"file_path": "client.ts", "kind": "Import"}]}
                         if d.endswith("acme__admin") else {"callsites": []})
     return admin
 
@@ -170,3 +170,12 @@ def _push_raw(repo="acme/api-service", branch="feature/payments", after="abc123"
         "repository": {"full_name": repo}, "pusher": {"name": "dev1"},
         "commits": [{"id": after, "added": ["src/api.ts"], "removed": [], "modified": []}],
     }
+
+
+def test_string_hits_are_not_consumption(tmp_path, monkeypatch):
+    _env(tmp_path, monkeypatch)
+    monkeypatch.setattr(cross_repo, "scan_callsites", lambda d, cfg: {"callsites": [
+        {"file_path": "src/proxy.rs", "kind": None, "matched_pattern": "api.api-service.com"},
+        {"file_path": "src/docs.rs", "kind": "", "matched_pattern": "api-service"},
+    ]})
+    assert cross_repo.consumes_source(str(tmp_path), "acme/api-service") == []

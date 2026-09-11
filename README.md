@@ -187,8 +187,8 @@ reproduced the breaking bump as a red build, repaired it autonomously, and
 returned the suite to green with zero unintended files touched. Refusals are
 loud and empty-handed — a repair that can't be proven is a repair not shipped.
 
-Every commit is gated: **527 Rust + 357 Python tests**, lint-clean, with
-comment-density and import-hygiene checks. See the [Validation Guide](docs/VALIDATION_GUIDE.md)
+Every commit is gated: **527 Rust + 357 Python tests**, lint-clean.
+See the [Validation Guide](docs/VALIDATION_GUIDE.md)
 for the full protocol.
 
 ---

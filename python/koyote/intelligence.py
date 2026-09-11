@@ -10,7 +10,7 @@ routes to AI; otherwise fails closed into QUARANTINE.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from koyote.change_source import ChangeSource
 from koyote.credentials import has_valid_credentials
@@ -27,9 +27,6 @@ class Decision:
     from_version: str = ""
     to_version: str = ""
     confidence: float = 0.0
-    estimated_tokens: int | None = None
-    expected_blast_radius: list[str] = field(default_factory=list)
-    verification_required: bool = True
 
 
 def resolve_migration(provider: str, from_version: str | None = None, to_version: str | None = None):
@@ -86,7 +83,6 @@ class KoyoteIntelligence:
                 from_version=actual_from,
                 to_version=actual_to,
                 confidence=0.95 if (hit or has_rewrites) else 0.8,
-                estimated_tokens=None,
             )
 
         elapsed = int((time.time() - t0) * 1000)
@@ -98,7 +94,6 @@ class KoyoteIntelligence:
             from_version=actual_from,
             to_version=actual_to,
             confidence=0.0,
-            estimated_tokens=None,
         )
 
     def decide_for_source(self, repo_dir: str, source: ChangeSource) -> Decision:
@@ -115,7 +110,6 @@ class KoyoteIntelligence:
                     from_version=source.version_from,
                     to_version=source.version_to,
                     confidence=0.8,
-                    estimated_tokens=None,
                 )
             return Decision(
                 strategy="QUARANTINE",
@@ -125,7 +119,6 @@ class KoyoteIntelligence:
                 from_version=source.version_from,
                 to_version=source.version_to,
                 confidence=0.0,
-                estimated_tokens=None,
             )
         return self.decide(
             repo_dir,

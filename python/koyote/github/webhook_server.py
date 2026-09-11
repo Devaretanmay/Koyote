@@ -66,6 +66,14 @@ class WebhookHTTPHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"status": "healthy", "service": "koyote-github-app"}).encode("utf-8"))
+        elif self.path.split("?")[0].rstrip("/") == "/dashboard":
+            from koyote.github.dashboard import render_dashboard
+            body = render_dashboard().encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         else:
             self.send_response(404)
             self.end_headers()
@@ -119,7 +127,9 @@ class WebhookServer:
         """Start the webhook listener server."""
         handler_cls = WebhookHTTPHandler
         handler_cls.webhook_secret = self.secret
-        handler_cls.event_handler = self.handler
+        handler_cls.event_handler = (
+            staticmethod(self.handler) if self.handler is not None else None
+        )
 
         self._server = HTTPServer((self.host, self.port), handler_cls)
         if blocking:

@@ -103,13 +103,6 @@ def run_inventory(repo_root: str = ".") -> dict[str, Any]:
     return {"repo_root": repo_root, "dependencies": [], "total_callsites": 0}
 
 
-def apply_patch(repo_root: str, plan: dict[str, Any]) -> list[dict[str, Any]]:
-    """Evaluate surgical AST patches for plan targets. Evaluate-only, never writes."""
-    if _core is not None:
-        return json.loads(_core.patch_apply(repo_root, json.dumps(plan), True))
-    return []
-
-
 def render_trust_report(plan: dict[str, Any]) -> str:
     """Render an enterprise-grade trust report from a maintenance plan."""
     if _core is not None:

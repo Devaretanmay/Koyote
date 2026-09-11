@@ -81,7 +81,7 @@ def _notified(tmp_path, monkeypatch):
         f.write("import { x } from 'api-service';\n")
     work_graph.record_push(parse_push_payload(_raw_push("acme/admin", "feature/work", "ddd", ())))
     monkeypatch.setattr(cross_repo, "scan_callsites",
-                        lambda d, cfg: {"callsites": [{"file_path": "client.ts"}]}
+                        lambda d, cfg: {"callsites": [{"file_path": "client.ts", "kind": "Import"}]}
                         if d.endswith("acme__admin") else {"callsites": []})
     monkeypatch.setattr(cross_repo.AIPatchPlanner, "from_env",
                         classmethod(lambda cls: AssessStub()))

@@ -7,6 +7,7 @@ import urllib.request
 from dataclasses import dataclass
 
 from koyote.credentials import load_credentials
+from koyote.redact import redact_secrets
 
 
 @dataclass
@@ -144,10 +145,23 @@ class LLMClient:
         self.config = config
 
     def complete(self, messages: list[dict[str, str]], system_prompt: str | None = None) -> LLMResponse:
-        """Send completion request to configured provider."""
+        """Send completion request to configured provider.
+
+        Message contents are secret-scrubbed first: repository file
+        contents routinely contain hardcoded keys, and nothing secret
+        may leave the machine toward the provider. The auth credential
+        itself travels only in request headers, never in the body.
+        """
+        scrubbed = []
+        for message in messages:
+            content = message.get("content", "")
+            clean, _ = redact_secrets(content) if isinstance(content, str) else (content, 0)
+            scrubbed.append({**message, "content": clean})
+        if system_prompt:
+            system_prompt, _ = redact_secrets(system_prompt)
         if self.config.provider == "anthropic":
-            return self._call_anthropic(messages, system_prompt)
-        return self._call_openai(messages, system_prompt)
+            return self._call_anthropic(scrubbed, system_prompt)
+        return self._call_openai(scrubbed, system_prompt)
 
     def _call_anthropic(self, messages: list[dict[str, str]], system_prompt: str | None) -> LLMResponse:
         url = self.config.base_url or "https://api.anthropic.com/v1/messages"

@@ -199,41 +199,5 @@ The `AgentKoyote` variant auto-enables insulation (credential proxy,
 snapshots, compression) via `KoyoteConfig(auto_modules=True)`; `Koyote`
 stays empty-by-default and everything here is opt-in.
 
----
-
-## 6. Framework hook adoptions (frameworks you already use)
-
-These are the same thing as use case 2 but in the shape your framework expects:
-a LangChain tool, a LangGraph node, a CrewAI interpreter, an AutoGen executor,
-or a data-science subprocess.
-
-```python
-# LangGraph : wrap any node callable in a sandboxed compartment.
-from koyote.hooks import KoyoteGraphNode
-node = KoyoteGraphNode(crunch, workdir=".", block_network=True)
-
-# LangChain REPL tool
-from koyote.hooks import KoyotePythonREPLTool
-tool = KoyotePythonREPLTool(permission=["fs_read", "fs_write", "fs_exec"])
-tool.invoke("print(6 * 7)")
-
-# CrewAI : replace the Docker code interpreter
-from koyote.hooks import KoyoteCodeInterpreterTool
-agent = Agent(tools=[KoyoteCodeInterpreterTool(block_network=True)], …)
-
-# AutoGen : each code block in its own compartment
-from koyote.hooks import KoyoteCodeExecutor, CodeBlock
-executor = KoyoteCodeExecutor()
-res = executor.execute_code_blocks([CodeBlock("python", "print('hi')")])
-
-# Data / RAG : mount ONLY the datasets; no network route out
-from koyote.hooks import DataScienceSandboxHook
-hook = DataScienceSandboxHook(allow_network=False)
-hook.mount_dataset("customers.csv")          # only this is visible
-res = hook.run("df = pd.read_csv('customers.csv'); print(df.shape)")
-print(res.diffs)                              # audited mutations
-hook.cleanup()
-```
-
-All examples above run against `koyote==1.1.2` as installed from PyPI / wheel
+All examples above run against `koyote==1.1.3` as installed from PyPI / wheel
 (including the Rust `_core`).

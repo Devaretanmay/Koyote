@@ -3,25 +3,18 @@
 Covers:
 - real-binary resolution that skips the workspace's own .koyote/bin shim dir
   (prevents shim self-recursion when the workspace is activated),
-- the KOYOTE_EXECUTION_ID shim bypass so an agent launched by an agent
-  inherits the parent execution boundary instead of being wrapped again,
 - the deterministic nested-workspace rule (innermost .koyote wins),
 - PtySupervisor resolving real binaries past the shim dir.
 """
 
 import os
-import subprocess
 import sys
 
 import pytest
 
-from koyote.cli.main import _SHIM_TEMPLATE, _resolve_real_binary
+from koyote.cli.main import _resolve_real_binary
 from koyote.config import find_workspace_root
 from koyote.engine.pty_supervisor import PtySupervisor
-
-REPO_PYTHON_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "python"
-)
 
 
 def _write_executable(path: str, content: str) -> str:
@@ -30,26 +23,6 @@ def _write_executable(path: str, content: str) -> str:
         f.write(content)
     os.chmod(path, 0o755)
     return path
-
-
-def _render_shim(workspace: str, agent: str, real_path: str) -> str:
-    """Write a rendered shim script into workspace/.koyote/bin/<agent>."""
-    shim_path = os.path.join(workspace, ".koyote", "bin", agent)
-    os.makedirs(os.path.dirname(shim_path), exist_ok=True)
-    with open(shim_path, "w", encoding="utf-8") as f:
-        f.write(_SHIM_TEMPLATE.format(agent=agent, real_path=real_path))
-    os.chmod(shim_path, 0o755)
-    return shim_path
-
-
-def _real_binary_script(marker_path: str) -> str:
-    return (
-        "#!/usr/bin/env bash\n"
-        f'echo "ran" > "{marker_path}"\n'
-        "exit 0\n"
-    )
-
-
 
 
 def test_resolve_real_binary_skips_workspace_shim_dir(tmp_path, monkeypatch):
@@ -87,100 +60,6 @@ def test_resolve_real_binary_ignores_other_workspace_shims(tmp_path, monkeypatch
     assert _resolve_real_binary("claude", str(tmp_path)) == other
 
 
-
-
-@pytest.mark.skipif(sys.platform == "win32", reason="shims are bash scripts")
-def test_shim_bypasses_when_execution_marker_set(tmp_path):
-    """An agent launched by another agent inherits the boundary: no re-wrap."""
-    workspace = tmp_path / "ws"
-    workspace.mkdir()
-    (workspace / ".koyote").mkdir(parents=True)
-
-    marker = tmp_path / "ran.out"
-    real_path = _write_executable(
-        str(workspace / "realagent"), _real_binary_script(str(marker))
-    )
-    shim = _render_shim(str(workspace), "koyote_test_agent", real_path)
-
-    env = {
-        **os.environ,
-        "KOYOTE_EXECUTION_ID": "exec_123",
-        "KOYOTE_TEST_MARKER": str(marker),
-    }
-    result = subprocess.run(
-        ["bash", shim, "--some", "args"],
-        cwd=str(workspace),
-        env=env,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, result.stderr
-    assert marker.exists(), "real binary should run directly when marker is set"
-
-
-@pytest.mark.skipif(sys.platform == "win32", reason="shims are bash scripts")
-def test_shim_runs_real_binary_outside_workspace(tmp_path):
-    """Outside any workspace, the shim is transparent: real binary runs."""
-    workspace = tmp_path / "ws"
-    workspace.mkdir()
-    (workspace / ".koyote").mkdir(parents=True)
-    outside = tmp_path / "outside"
-    outside.mkdir()
-
-    marker = tmp_path / "ran.out"
-    real_path = _write_executable(
-        str(workspace / "realagent"), _real_binary_script(str(marker))
-    )
-    shim = _render_shim(str(workspace), "koyote_test_agent", real_path)
-
-    env = {**os.environ, "KOYOTE_TEST_MARKER": str(marker)}
-    result = subprocess.run(
-        ["bash", shim],
-        cwd=str(outside),
-        env=env,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, result.stderr
-    assert marker.exists(), "real binary should run outside a workspace"
-
-
-@pytest.mark.skipif(sys.platform == "win32", reason="shims are bash scripts")
-def test_shim_delegates_to_exec_shim_inside_workspace(tmp_path):
-    """Inside a workspace without a marker, the shim delegates to _exec_shim.
-
-    The fake agent name is unresolvable, so _exec_shim fails fast (exit 127)
-    and the real binary is never reached.
-    """
-    workspace = tmp_path / "ws"
-    workspace.mkdir()
-    (workspace / ".koyote").mkdir(parents=True)
-
-    marker = tmp_path / "ran.out"
-    real_path = _write_executable(
-        str(workspace / "realagent"), _real_binary_script(str(marker))
-    )
-    shim = _render_shim(str(workspace), "koyote_fake_agent_xyz", real_path)
-
-    env = {
-        **os.environ,
-        "PYTHONPATH": REPO_PYTHON_DIR + os.pathsep + os.environ.get("PYTHONPATH", ""),
-        "KOYOTE_TEST_MARKER": str(marker),
-    }
-    result = subprocess.run(
-        ["bash", shim],
-        cwd=str(workspace),
-        env=env,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 127, result.stderr
-    assert "Could not find agent binary" in (result.stdout + result.stderr)
-    assert not marker.exists(), "real binary must not run when _exec_shim governs"
-
-
-
-
 def test_find_workspace_root_innermost_wins(tmp_path):
     """A workspace nested inside another resolves to the innermost root."""
     (tmp_path / ".koyote").mkdir()
@@ -191,8 +70,6 @@ def test_find_workspace_root_innermost_wins(tmp_path):
 
     assert find_workspace_root(str(deep)) == str(inner)
     assert find_workspace_root(str(tmp_path)) == str(tmp_path)
-
-
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="PTY not available on Windows")

@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Optional
 
 from koyote import work_graph
 from koyote.ai_planner import AIPatchPlanner, build_reasoning_context
+from koyote.audit import is_code_evidence
 from koyote.autopatch import ScanConfig, scan_callsites
 from koyote.git_ops import git_commit_and_push
 from koyote.github.installations import store_dir as installations_store_dir
@@ -104,13 +105,17 @@ def short_name(repo: str) -> str:
 
 
 def consumes_source(consumer_checkout_dir: str, source_repo: str) -> List[Dict[str, Any]]:
-    """Cheap consumption evidence via the existing AST locator. Zero AI tokens."""
+    """Cheap consumption evidence via the existing AST locator. Zero AI tokens.
+
+    Only structurally-evidenced callsites count: bare name/URL substring
+    hits without an AST kind are strings/docs, not consumption.
+    """
     try:
         res = scan_callsites(consumer_checkout_dir, ScanConfig(sdk_names=[short_name(source_repo)]))
     except Exception as e:
         _logger.warning("cross-repo scan failed for %s: %s", consumer_checkout_dir, e)
         return []
-    return res.get("callsites", []) or []
+    return [c for c in (res.get("callsites", []) or []) if is_code_evidence(c)]
 
 
 def find_plausible_targets(source_repo: str, source_branch: str) -> List[Dict[str, Any]]:

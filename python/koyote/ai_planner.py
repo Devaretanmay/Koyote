@@ -1,9 +1,10 @@
-"""AI maintenance reasoning: deep repository + change context, deterministic application.
+"""AI maintenance reasoning: deep repository + change context, exact-match application.
 
 The model reasons over codebase context, change context, verified history, and
-known failures; Koyote applies the resulting SEARCH/REPLACE edits, verifies
-them in the sandbox, and quarantines on failure. AI-first on top,
-deterministic underneath.
+known failures; Koyote applies the resulting AI-authored SEARCH/REPLACE edits
+by exact match only, verifies them in the sandbox, and quarantines on failure.
+AI-first on top, exact-match execution underneath. No regex fixers, no rewrite
+rules, and no deterministic fallback ever author source changes here.
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ _CONFIDENCE_REGEX = re.compile(r"confidence\s*:\s*(high|medium|low)", re.IGNOREC
 
 def parse_confidence(text: str) -> str:
     """Extract a trailing Confidence: high|medium|low line. Unknown when absent."""
-    match = _CONFIDENCE_REGEX.search(text)
+    match = _CONFIDENCE_REGEX.search(text.replace("*", ""))
     return match.group(1).lower() if match else "unknown"
 
 
@@ -63,7 +64,7 @@ def ai_followup_for_missed(
     changelog_url: str = "",
     dry_run: bool = False,
 ) -> tuple[list[PatchResult], "AIPatchPlanner" | None]:
-    """AI reasoning for affected files deterministic rewrites didn't reach.
+    """AI reasoning for affected files the evidence pass surfaced but left unpatched.
 
     Returns ([], None) when nothing is missed or no provider is configured —
     callers keep their honest refusal path untouched.
@@ -325,6 +326,10 @@ class AIPatchPlanner:
             "2. Preserve exact formatting, indentation, and unrelated logic.\n"
             "3. NEVER invent identifiers, files, symbols, APIs, or configuration.\n"
             "4. A nonexistent identifier is a reasoning failure.\n"
+            "5. Minimal code only (YAGNI): no new abstractions, helpers, "
+            "config options, or speculative generality. The smallest diff "
+            "that fixes the affected lines wins; extra code is a defect.\n"
+            "6. Do not refactor, rename, or 'improve' surrounding code.\n"
             "Emit surgical updates as search-and-replace blocks:\n"
             "<<<<<<< SEARCH\n"
             "exact lines to replace\n"

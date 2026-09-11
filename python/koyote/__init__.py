@@ -8,6 +8,9 @@ from . import graph as graph
 from . import audit as audit
 from . import maintenance as maintenance
 from . import maintenance_agents as maintenance_agents
+from . import hunt as hunt
+from . import hunt_ports as hunt_ports
+from . import redact as redact
 from . import pipeline as pipeline
 from . import github as github
 
@@ -28,6 +31,9 @@ __all__ = [
     "audit",
     "maintenance",
     "maintenance_agents",
+    "hunt",
+    "hunt_ports",
+    "redact",
     "pipeline",
     "github",
 ]

@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock
 
-from koyote.ai_planner import AIPatchPlanner, parse_search_replace_blocks
+from koyote.ai_planner import AIPatchPlanner, parse_confidence, parse_search_replace_blocks
 from koyote.llm import LLMClient, LLMResponse
 
 
@@ -102,3 +102,11 @@ class TestAIPatchPlanner(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_parse_confidence_variants(tmp_path=None):
+    assert parse_confidence("analysis\nConfidence: high") == "high"
+    assert parse_confidence("analysis\n**Confidence:** high") == "high"
+    assert parse_confidence("analysis\n**Confidence: medium**") == "medium"
+    assert parse_confidence("analysis\nconfidence : low") == "low"
+    assert parse_confidence("no confidence line here") == "unknown"

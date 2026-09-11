@@ -1,9 +1,10 @@
 import hashlib
 import hmac
 import json
+import urllib.request
 
 from koyote.github.client import verify_webhook_signature
-from koyote.github.webhook_server import handle_webhook_payload
+from koyote.github.webhook_server import WebhookServer, handle_webhook_payload
 from koyote.github.trust_pr import generate_trust_pr_markdown, TrustPRMetadata
 
 
@@ -69,3 +70,66 @@ def test_trust_pr_markdown_generation():
     assert "SUCCESS (GREEN)" in markdown
     assert "42ms" in markdown
     assert "— Hunt, Work bot" in markdown
+
+
+def test_http_server_delivers_to_handler_unbound(tmp_path):
+    """Regression: handler stored on the handler class must not bind self
+    over HTTP (TypeError: takes 2 args but 3 given). Exercises the real
+    socket path, not handle_webhook_payload directly."""
+    seen = []
+
+    def handler(data, event_type):
+        seen.append((data.get("repository", {}).get("full_name"), event_type))
+        return {"ok": True}
+
+    server = WebhookServer(port=0, secret=None, handler=handler)
+    server.start(blocking=False)
+    try:
+        port = server._server.server_address[1]
+        body = json.dumps({"ref": "refs/heads/main",
+                           "repository": {"full_name": "acme/demo"}}).encode()
+        req = urllib.request.Request(
+            f"http://localhost:{port}/webhook", data=body,
+            headers={"Content-Type": "application/json",
+                     "X-GitHub-Event": "push"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            res = json.load(resp)
+        assert res["success"] is True
+        assert res["handler_result"] == {"ok": True}
+        assert seen == [("acme/demo", "push")]
+    finally:
+        server.stop()
+
+
+def test_dashboard_renders_state(tmp_path, monkeypatch):
+    from koyote import work_graph
+    from koyote.github.dashboard import collect_dashboard, render_dashboard
+    from koyote.github.push_events import parse_push_payload
+    monkeypatch.setenv("KOYOTE_WORK_GRAPH_FILE", str(tmp_path / "wg.json"))
+    work_graph.record_push(parse_push_payload({
+        "ref": "refs/heads/feature/payments", "before": "0" * 40, "after": "abc123",
+        "repository": {"full_name": "acme/api-service"}, "pusher": {"name": "dev1"},
+        "commits": []}), exact_sha=True)
+    data = collect_dashboard()
+    assert len(data["candidates"]) == 1
+    assert data["candidates"][0]["status"] == "OBSERVED"
+    page = render_dashboard()
+    assert "acme/api-service" in page and "OBSERVED" in page
+
+
+def test_dashboard_ux_elements(tmp_path, monkeypatch):
+    from koyote import work_graph
+    from koyote.github.dashboard import render_dashboard
+    from koyote.github.push_events import parse_push_payload
+    monkeypatch.setenv("KOYOTE_WORK_GRAPH_FILE", str(tmp_path / "wg2.json"))
+    work_graph.record_push(parse_push_payload({
+        "ref": "refs/heads/feature/payments", "before": "0" * 40, "after": "abc123",
+        "repository": {"full_name": "acme/api-service"}, "pusher": {"name": "dev1"},
+        "commits": []}))
+    page = render_dashboard()
+    assert 'http-equiv=refresh content="20"' in page  # honest auto-refresh
+    assert "candidates tracked" in page and "need attention" in page
+    assert "border-radius:999px" in page and "OBSERVED" in page  # text badge, not color alone
+    assert "ago" in page or "just now" in page  # freshness signal
+    assert "https://github.com/acme/api-service" in page  # drill link
+    assert "viewport" in page

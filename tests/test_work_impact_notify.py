@@ -82,7 +82,7 @@ def _setup(tmp_path, monkeypatch, consumers=("acme/admin",), confidence="high"):
     work_graph.record_push(parse_push_payload(
         _raw_push("acme/api-service", "feature/payments", "aaa")))
     monkeypatch.setattr(cross_repo, "scan_callsites",
-                        lambda d, cfg: {"callsites": [{"file_path": "client.ts"}]}
+                        lambda d, cfg: {"callsites": [{"file_path": "client.ts", "kind": "Import"}]}
                         if "__admin" in d or "__mobile" in d else {"callsites": []})
     stub = StubPlanner(confidence=confidence)
     monkeypatch.setattr(cross_repo.AIPatchPlanner, "from_env",

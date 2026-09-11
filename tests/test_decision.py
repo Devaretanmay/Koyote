@@ -16,10 +16,8 @@ def test_quarantine_for_known_sdk_rewrite_without_creds(tmp_path, monkeypatch):
         monkeypatch.delenv(k, raising=False)
     d = KoyoteIntelligence().decide("/tmp", "stripe", "11.18.0", "13.0.0", has_rewrites=True)
     assert d.strategy == "QUARANTINE"
-    assert d.estimated_tokens is None
     assert d.confidence == 0.0
     assert d.reason == "no_credentials_for_ai"
-    assert d.verification_required is True
 
 
 def test_ai_authored_when_credentials_present(tmp_path, monkeypatch):
@@ -71,6 +69,3 @@ def test_decide_for_source_future_kind_quarantines_without_creds(tmp_path, monke
 def test_decision_fields_have_sane_defaults():
     d = Decision(strategy="DIRECT", reason="test")
     assert d.confidence == 0.0
-    assert d.estimated_tokens is None
-    assert d.expected_blast_radius == []
-    assert d.verification_required is True

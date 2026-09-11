@@ -1,13 +1,12 @@
-"""Tests for the framework integration hooks (koyote.hooks).
+"""Tests for the execution hooks (koyote.hooks).
 
 All hooks are exercised with ``sandbox=False`` because the kernel sandbox
 (Landlock / Seatbelt) is irreversible per process: applying it inside pytest
 would isolate the shared test process. The Python-level SandboxEnforcer still
 runs inside every compartment, so permission checks and execution behaviour
-are tested for real. Stdlib-unittest, no framework dependencies required.
+are tested for real.
 """
 
-import asyncio
 import os
 import shutil
 import tempfile
@@ -22,10 +21,6 @@ from koyote.hooks.base import (
     index_workdir,
     validate_permissions,
 )
-from koyote.hooks.langchain import KoyoteGraphNode, KoyotePythonREPLTool
-from koyote.hooks.crewai import KoyoteCodeInterpreterTool, CrewAICodeExecutor
-from koyote.hooks.autogen import KoyoteCodeExecutor, CodeBlock, CodeResult
-from koyote.hooks.data_agent import DataScienceSandboxHook
 
 
 class TempCase(unittest.TestCase):
@@ -137,176 +132,6 @@ class TestSandboxRunner(TempCase):
         )
         self.assertEqual(res.returncode, 2)
         self.assertIn("unsupported", res.stderr)
-
-
-class TestLangchainTool(TempCase):
-    def test_runs_code(self):
-        tool = KoyotePythonREPLTool(workdir=self.workdir, sandbox=False)
-        self.assertIn("2", tool._run("print(1 + 1)"))
-
-    def test_sanitizes_input(self):
-        tool = KoyotePythonREPLTool(workdir=self.workdir, sandbox=False)
-        self.assertIn("42", tool._run("```python\nprint(40 + 2)\n```"))
-
-    def test_invoke(self):
-        tool = KoyotePythonREPLTool(workdir=self.workdir, sandbox=False)
-        self.assertIn("7", tool.invoke("print(3 + 4)"))
-
-    def test_rejects_bad_permission(self):
-        with self.assertRaises(ValueError):
-            KoyotePythonREPLTool(workdir=self.workdir, permission=["banana"])
-
-
-class TestLanggraphNode(TempCase):
-    def test_node_runs_state_fn(self):
-        def crunch(state, ctx):
-            return {"result": state["input"] + 1}
-
-        node = KoyoteGraphNode(crunch, workdir=self.workdir, sandbox=False).as_node()
-        self.assertEqual(node({"input": 1}), {"result": 2})
-
-    def test_node_error_propagates(self):
-        def boom(state, ctx):
-            raise RuntimeError("kaboom")
-
-        node = KoyoteGraphNode(boom, workdir=self.workdir, sandbox=False).as_node()
-        result = node({})
-        self.assertIn("error", result)
-        self.assertIn("kaboom", result["error"])
-
-    def test_attach_registers_metadata(self):
-        class FakeBuilder:
-            def __init__(self):
-                self.nodes = {}
-
-            def add_node(self, name, action, metadata=None):
-                self.nodes[name] = (action, metadata)
-
-        builder = FakeBuilder()
-        g = KoyoteGraphNode(
-            lambda state, ctx: {"done": True}, workdir=self.workdir, sandbox=False,
-        )
-        name = g.attach(builder, name="work", metadata={"permissions": ["fs_read", "fs_exec"]})
-        self.assertEqual(name, "work")
-        action, metadata = builder.nodes["work"]
-        self.assertEqual(metadata["permissions"], ["fs_read", "fs_exec"])
-        self.assertTrue(callable(action))
-
-    def test_attach_missing_builder_raises(self):
-        g = KoyoteGraphNode(lambda state, ctx: {}, workdir=self.workdir, sandbox=False)
-        with self.assertRaises(TypeError):
-            g.attach(None)
-
-    def test_attach_embeds_permissions_in_metadata(self):
-        class FakeBuilder:
-            def add_node(self, name, action, metadata=None):
-                self.meta = metadata
-
-        builder = FakeBuilder()
-        g = KoyoteGraphNode(
-            lambda state, ctx: {}, workdir=self.workdir, sandbox=False,
-            permission=["fs_read", "fs_write"],
-        )
-        g.attach(builder, name="x")
-        self.assertEqual(builder.meta["permissions"], ["fs_read", "fs_write"])
-
-
-class TestCrewAI(TempCase):
-    def test_code_interpreter_runs(self):
-        tool = KoyoteCodeInterpreterTool(workdir=self.workdir, sandbox=False)
-        self.assertIn("crew hi", tool._run(code="print('crew hi')"))
-
-    def test_callable_contract(self):
-        tool = KoyoteCodeInterpreterTool(workdir=self.workdir, sandbox=False)
-        self.assertIn("callable", tool("print('callable')"))
-
-    def test_error_surface(self):
-        tool = KoyoteCodeInterpreterTool(workdir=self.workdir, sandbox=False)
-        self.assertIn("ValueError", tool._run(code="raise ValueError('boom')"))
-
-    def test_executor(self):
-        ex = CrewAICodeExecutor(workdir=self.workdir, sandbox=False)
-        self.assertIn("exec", ex.run("print('exec')").output)
-        self.assertEqual(ex.execute("print(2 * 2)")["returncode"], 0)
-
-
-class TestAutoGen(TempCase):
-    def test_python_blocks(self):
-        ex = KoyoteCodeExecutor(workdir=self.workdir, sandbox=False)
-        result = ex.execute_code_blocks([CodeBlock("python", "print('autogen')")])
-        self.assertIsInstance(result, CodeResult)
-        self.assertEqual(result.exit_code, 0)
-        self.assertIn("autogen", result.output)
-        self.assertTrue(result)
-
-    def test_shell_blocks(self):
-        result = KoyoteCodeExecutor(workdir=self.workdir, sandbox=False).execute_code_blocks(
-            [CodeBlock("bash", "echo shell-block")]
-        )
-        self.assertEqual(result.exit_code, 0)
-        self.assertIn("shell-block", result.output)
-
-    def test_empty_blocks(self):
-        result = KoyoteCodeExecutor(workdir=self.workdir, sandbox=False).execute_code_blocks([])
-        self.assertEqual(result.exit_code, 0)
-        self.assertEqual(result.output, "")
-
-    def test_async_execution(self):
-        result = asyncio.run(
-            KoyoteCodeExecutor(workdir=self.workdir, sandbox=False).aexecute_code_blocks(
-                [CodeBlock("python", "print('async')")]
-            )
-        )
-        self.assertIn("async", result.output)
-
-    def test_restart(self):
-        KoyoteCodeExecutor(workdir=self.workdir, sandbox=False).restart()
-
-    def test_extractor_parses_markdown(self):
-        executor = KoyoteCodeExecutor(workdir=self.workdir, sandbox=False)
-        blocks = executor.code_extractor.extract_code_blocks("```python\nprint(1)\n```")
-        self.assertGreater(len(blocks), 0)
-
-
-class TestDataSandbox(TempCase):
-    def test_isolated_workspace(self):
-        hook = DataScienceSandboxHook(workdir=self.workdir, sandbox=False)
-        self.assertTrue(os.path.isdir(hook.workspace))
-        self.assertTrue(hook.block_network)
-        hook.cleanup()
-
-    def test_mount_and_run(self):
-        csv_path = self._write("orders.csv", "id,amount\n1,2\n2,3\n")
-        safe = os.path.join(self.base, "safe")
-        os.makedirs(safe, exist_ok=True)
-        hook = DataScienceSandboxHook(workdir=safe, sandbox=False)
-        self.assertEqual(hook.mount_dataset(csv_path), ["orders.csv"])
-        res = hook.run(
-            "import csv, json\n"
-            "rows = list(csv.reader(open('orders.csv')))\n"
-            "print(json.dumps({'rows': len(rows)}))\n"
-        )
-        self.assertEqual(res.returncode, 0)
-        self.assertIn('"rows"', res.stdout)
-        with open(csv_path) as fh:
-            self.assertEqual(fh.read().splitlines()[0], "id,amount")
-        hook.cleanup()
-
-    def test_missing_dataset_raises(self):
-        hook = DataScienceSandboxHook(workdir=self.workdir, sandbox=False)
-        with self.assertRaises(ValueError):
-            hook.mount_dataset(os.path.join(self.base, "nope.csv"))
-        hook.cleanup()
-
-    def test_allow_network_flag(self):
-        hook = DataScienceSandboxHook(workdir=self.workdir, allow_network=True, sandbox=False)
-        self.assertFalse(hook.block_network)
-        hook.cleanup()
-
-    def test_install_empty(self):
-        hook = DataScienceSandboxHook(workdir=self.workdir, sandbox=False)
-        self.assertEqual(hook.install([]).returncode, 0)
-        hook.cleanup()
 
 
 if __name__ == "__main__":
