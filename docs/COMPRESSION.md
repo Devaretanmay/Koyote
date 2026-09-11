@@ -40,8 +40,13 @@ print(compressed_log)
 
 ---
 
-## 3. Why This Matters for Autonomous Maintenance
+## 3. Where Compression Is Wired
 
-* **Scalable Evidence Bundles**: Test failure outputs are attached to GitHub PRs and issues without hitting character limits.
-* **Efficient Agent Loops**: When test verification diagnoses a test failure, it feeds high-signal stack traces directly to `AIPatchPlanner` without blowing token context budgets.
+* **Compartment outputs**: `Box.enable_compression()` (auto-enabled on
+  `AgentKoyote`) compresses large compartment results above the size
+  threshold; `compressed_outputs` exposes the distilled text.
+* **Hunt verification evidence** uses bounded raw capture instead
+  (test output capped per attempt, diff previews capped per PR body),
+  so repair evidence is never lossy-compressed before the model or
+  the reviewer sees it.
 * **Deterministic Compression**: Fast, reproducible Rust execution ensures evidence is compressed identically across runs.

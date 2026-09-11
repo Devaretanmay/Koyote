@@ -18,8 +18,7 @@ All notable changes to Koyote are documented here.
 ### Removed
 - **Framework hook adapters** (`hooks/langchain.py`, `hooks/crewai.py`, `hooks/autogen.py`, `hooks/data_agent.py`): zero in-repo consumers.
 - **Surgical AST patcher engine** (`engines/autopatch/patcher.rs`, its binding, and the `autopatch.apply_patch` wrapper): no product caller; a contract test now pins the deterministic patch surface as absent.
-- **Dead native modules** (`runtime/snapshot.rs`, `runtime/credential.rs`) and the **CI runner** (`koyote/ci/`): no callers.
-- **Dead CLI machinery**: uncalled workspace-shim writer and templates; removed `estimated_tokens` / `expected_blast_radius` / `verification_required` from `Decision`.
+- **CI runner** (`koyote/ci/`): no callers.
 - **Bespoke test gates** in `scripts/run_all_tests.py` (comment-density, inline-import, demo-file checks): `ruff` + `cargo test` + `pytest` remain.
 
 ## [1.1.1] - 2026-09-09

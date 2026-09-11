@@ -38,7 +38,7 @@ npm test
 ```ts
 import * as koyote from '@koyote/sdk'
 
-koyote.version()                    // "1.1.0"
+koyote.version()                    // "1.1.3"
 koyote.sandboxSupported()           // true
 const out = koyote.compress(text)
 

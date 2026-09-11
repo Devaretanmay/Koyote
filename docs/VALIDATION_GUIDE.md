@@ -50,18 +50,20 @@ koyote check . --format=github-issue
 
 ---
 
-## 3. Test Scenario 3: Autonomous Continuous Maintenance Loop
+## 3. Test Scenario 3: Autonomous Repair Loop
 
-Detect upstream API drift and synthesize verified AST patches against breaking changes.
+Detect upstream API drift, then repair from a finding ID with AI-authored,
+sandbox-verified patches against breaking changes.
 
 ```bash
-koyote work . --provider stripe
+koyote check .                # note the finding ID, e.g. stripe-3a9c79
+koyote hunt stripe-3a9c79     # full reasoning → repair → sandbox → verify cycle
 ```
 
 ### What You Observe:
-- Scans manifests and callsites against official provider contracts.
-- AI reasons about impact, generates verified repairs, and runs local formatters (prettier/ruff).
-- Validates repository tests and blast-radius constraints before creating a Developer Trust PR.
+- Scans manifests and callsites against provider contracts.
+- AI reasons about impact, authors the repair, and verifies it in an isolated sandbox worktree with the real test command.
+- Validates blast-radius constraints; refusals are loud with zero files touched, and only sealed green repairs may proceed to a Developer Trust PR.
 
 ---
 

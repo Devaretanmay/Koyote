@@ -1,6 +1,6 @@
 # Koyote GitHub App daemon.
-# Build:  docker build -f docker/Dockerfile.app -t koyote-app:1.1.0 .
-# Run:    docker run -p 8080:8080 --env-file .env -v koyote-data:/data koyote-app:1.1.0
+# Build:  docker build -f docker/Dockerfile.app -t koyote-app:1.1.3 .
+# Run:    docker run -p 8080:8080 --env-file .env -v koyote-data:/data koyote-app:1.1.3
 # Requires KOYOTE_WEBHOOK_SECRET. See docs/DEPLOY.md.
 
 FROM rust:1.82-bookworm AS builder

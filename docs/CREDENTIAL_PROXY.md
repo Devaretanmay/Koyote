@@ -1,6 +1,6 @@
-# Zero-Trust Credential Proxy & Secret Masking Guide
+# Zero-Trust Credential Proxy Guide
 
-Koyote includes a built-in Credential Proxy that allows AI agents to make outbound API requests without ever exposing raw API keys or secrets to agent code or LLM context windows.
+Koyote includes a built-in Credential Proxy that allows AI agents to make outbound API requests without ever storing raw API keys in agent-readable configuration: keys live in host environment variables and are injected into proxied requests in memory.
 
 ---
 

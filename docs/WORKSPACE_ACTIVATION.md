@@ -51,17 +51,20 @@ koyote status
 ```
 
 ```text
-KOYOTE WORKSPACE: billing-service
+================================================================================
+                              KOYOTE STATUS
+================================================================================
 
-AGENTS RUNNING
-  none
+GitHub:             CONNECTED (Devaretanmay)
+AI:                 CONNECTED (groq)
+Active repo:        acme/checkout-service
+Repositories:       3
+Repository Key:     kyp_da1358315f6c9d1ad8791cbf8cb9
+Howl:               AVAILABLE
+Hunt:               AVAILABLE
+Status:             READY
 
-RECENT SESSIONS
-  [OK] Claude       lane:default_lane 1 change(s)  (0.5s)
-
-SECURITY
-  0 blocked action(s)
-  0 credential escapes
+================================================================================
 ```
 
 ---
